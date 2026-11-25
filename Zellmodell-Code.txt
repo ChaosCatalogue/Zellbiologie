@@ -1,0 +1,3322 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tierische Zelle – 3D-Modell</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, "Segoe UI", sans-serif;
+      color: #172033;
+      background: #e8f0fa;
+    }
+
+    * { box-sizing: border-box; }
+
+    body { margin: 0; min-height: 100vh; }
+
+    .viewer {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at 68% 48%, rgb(255 255 255 / 84%), transparent 50%),
+        radial-gradient(ellipse at 20% 85%, rgb(193 218 247 / 45%), transparent 45%),
+        linear-gradient(145deg, #edf4fb, #dce9f8);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    .panel {
+      position: absolute;
+      z-index: 1;
+      top: 1rem;
+      left: 1rem;
+      width: min(21rem, calc(100vw - 2rem));
+      padding: 1rem 1.1rem;
+      border: 1px solid rgb(255 255 255 / 82%);
+      border-radius: 1.1rem;
+      background: linear-gradient(145deg, rgb(255 255 255 / 94%), rgb(245 249 255 / 88%));
+      box-shadow: 0 0.75rem 2.5rem rgb(28 48 78 / 14%);
+      backdrop-filter: blur(0.5rem);
+    }
+
+    h1 { margin: 0 0 0.35rem; font-size: 1.2rem; }
+    p { margin: 0; color: #536176; font-size: 0.9rem; line-height: 1.5; }
+
+    .organelles {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.4rem;
+      max-height: 9rem;
+      overflow-y: auto;
+      margin: 0.85rem 0;
+    }
+
+    .view-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-top: 0.75rem;
+    }
+
+    .view-actions button { flex: 1 1 auto; }
+    #explore-toggle[aria-pressed="true"] { background: #ad5b2b; }
+    #tissue-toggle[aria-pressed="true"] { background: #76529c; }
+    #explore-help { margin-top: 0.55rem; font-size: 0.76rem; }
+    #tissue-status { margin-top: 0.55rem; font-size: 0.74rem; }
+
+    .process-control {
+      display: grid;
+      gap: 0.35rem;
+      margin-top: 0.7rem;
+      color: #43536b;
+      font-size: 0.78rem;
+      font-weight: 650;
+    }
+
+    .process-control select {
+      width: 100%;
+      min-width: 0;
+      padding: 0.5rem 0.6rem;
+      border: 1px solid #c6d5e8;
+      border-radius: 0.55rem;
+      color: #24466f;
+      background: rgb(255 255 255 / 92%);
+      font: inherit;
+    }
+
+    .cell-scale {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 0.45rem;
+      align-items: baseline;
+      margin-top: 0.6rem;
+      color: #64748b;
+      font-size: 0.74rem;
+    }
+
+    .cell-scale strong { color: #2764ad; font-size: 0.82rem; }
+
+    button {
+      padding: 0.55rem 0.8rem;
+      border: 0;
+      border-radius: 0.55rem;
+      color: white;
+      background: #2764ad;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button:hover { background: #194f91; }
+    button:focus-visible { outline: 3px solid #85baff; outline-offset: 2px; }
+
+    .organelles button {
+      min-width: 0;
+      padding: 0.4rem 0.6rem;
+      color: #24466f;
+      background: #e8f1fb;
+      font-size: 0.76rem;
+      line-height: 1.25;
+      text-align: left;
+    }
+
+    .organelles button:hover,
+    .organelles button[aria-pressed="true"] { color: white; background: #2764ad; }
+
+    .detail-panel {
+      position: absolute;
+      z-index: 2;
+      top: 1rem;
+      right: 1rem;
+      width: min(23rem, calc(100vw - 2rem));
+      max-height: calc(100vh - 2rem);
+      overflow-y: auto;
+      padding: 1.2rem;
+      border: 1px solid rgb(255 255 255 / 80%);
+      border-radius: 1.2rem;
+      background: linear-gradient(155deg, rgb(255 255 255 / 58%), rgb(242 247 255 / 52%));
+      box-shadow: 0 0.8rem 2.8rem rgb(28 48 78 / 20%);
+      backdrop-filter: blur(0.8rem) saturate(1.2);
+    }
+
+    .detail-panel[hidden] { display: none; }
+    .detail-panel h2 { margin: 0 0 0.75rem; font-size: 1.35rem; }
+    .detail-panel h3 { margin: 1rem 0 0.25rem; font-size: 0.95rem; }
+    .detail-panel p { color: #44536a; }
+    .detail-panel .eyebrow {
+      margin-bottom: 0.35rem;
+      color: #2764ad;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .fact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.55rem;
+      margin-top: 1rem;
+    }
+
+    .fact {
+      min-width: 0;
+      padding: 0.7rem;
+      border: 1px solid rgb(225 234 245 / 78%);
+      border-radius: 0.75rem;
+      background: rgb(237 244 252 / 42%);
+    }
+
+    .fact span,
+    .fact strong { display: block; }
+
+    .fact span {
+      margin-bottom: 0.25rem;
+      color: #63738a;
+      font-size: 0.72rem;
+    }
+
+    .fact strong { color: #24466f; font-size: 0.9rem; }
+
+    .estimate-note {
+      margin-top: 0.55rem;
+      font-size: 0.72rem;
+      line-height: 1.45;
+    }
+
+    .animation-note {
+      display: flex;
+      gap: 0.65rem;
+      align-items: flex-start;
+      margin-top: 1rem;
+      padding: 0.8rem;
+      border: 1px solid rgb(225 234 245 / 72%);
+      border-radius: 0.85rem;
+      background: rgb(243 248 255 / 36%);
+    }
+
+    .animation-note h3 {
+      margin: 0 0 0.25rem;
+      color: #24466f;
+      font-size: 0.85rem;
+    }
+
+    .animation-indicator {
+      width: 0.62rem;
+      height: 0.62rem;
+      flex: 0 0 auto;
+      margin-top: 0.15rem;
+      border-radius: 50%;
+      background: #e99e42;
+      box-shadow: 0 0 0 0 rgb(233 158 66 / 45%);
+      animation: indicator-pulse 1.7s ease-out infinite;
+    }
+
+    .animation-note p { font-size: 0.8rem; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; }
+      .animation-indicator { animation: none; }
+    }
+
+    @keyframes indicator-pulse {
+      60% { box-shadow: 0 0 0 0.45rem rgb(233 158 66 / 0%); }
+      100% { box-shadow: 0 0 0 0 rgb(233 158 66 / 0%); }
+    }
+
+    .detail-panel button { margin-top: 1.1rem; }
+
+    .error {
+      position: absolute;
+      inset: 50% auto auto 50%;
+      width: min(34rem, calc(100vw - 2rem));
+      padding: 1rem;
+      transform: translate(-50%, -50%);
+      border-radius: 0.75rem;
+      background: white;
+      color: #9c2525;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 1200px) {
+      .panel {
+        top: 0.6rem;
+        right: 0.6rem;
+        left: 0.6rem;
+        width: auto;
+        padding: 0.65rem 0.8rem;
+      }
+
+      .panel p { display: none; }
+      .panel #explore-help:not([hidden]) { display: block; }
+      .panel #tissue-status:not([hidden]) { display: block; }
+      .organelles {
+        display: flex;
+        flex-wrap: nowrap;
+        max-height: none;
+        overflow-x: auto;
+        overflow-y: hidden;
+        margin: 0.6rem 0;
+        padding-bottom: 0.1rem;
+      }
+      .organelles button { flex: 0 0 auto; text-align: center; }
+      .view-actions { margin-top: 0.55rem; }
+      .view-actions button { padding: 0.45rem 0.55rem; font-size: 0.78rem; }
+
+      h1 { margin: 0; font-size: 1rem; }
+      .panel.compact { max-height: 42vh; overflow-y: auto; }
+      .detail-panel { top: auto; right: 0.6rem; bottom: 0.6rem; left: 0.6rem; width: auto; max-height: 52vh; padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="viewer" aria-label="Interaktives 3D-Modell einer tierischen Zelle">
+    <section class="panel" aria-labelledby="title">
+      <h1 id="title">Tierische Zelle</h1>
+      <p>Drehen: ziehen · Zoomen: Mausrad · Verschieben: rechte Maustaste</p>
+      <div class="cell-scale"><strong>Ø ca. 10–30 µm</strong><span>typischer Richtwert für viele tierische Zellen</span></div>
+      <nav id="organelle-list" class="organelles" aria-label="Zellstruktur auswählen"></nav>
+      <div class="view-actions">
+        <button id="explore-toggle" type="button" aria-pressed="false" aria-controls="explore-help">Innenansicht starten</button>
+        <button id="tissue-toggle" type="button" aria-pressed="false" aria-controls="tissue-status">Gewebeansicht starten</button>
+        <button id="reset-view" type="button">Zelle zentrieren</button>
+      </div>
+      <p id="tissue-status" hidden aria-live="polite">Schematisches Gewebe: Nachbarzellen, Interstitium und extrazelluläre Matrix (ECM). Gap Junctions sind zelltypspezifisch.</p>
+      <label class="process-control" for="process-select">
+          <span id="process-label">Zellprozess im 3D-Modell</span>
+        <select id="process-select">
+          <option value="">Prozess auswählen …</option>
+          <option value="glycolysis">Glykolyse im Cytosol</option>
+          <option value="nuclearTranscription">Transkription und mRNA-Export</option>
+          <option value="citricCycle">Citratzyklus in der Matrix</option>
+          <option value="electronTransport">Elektronen- und Protonentransport</option>
+          <option value="golgiSecretion">Golgi-Transport in den Extrazellularraum</option>
+          <option value="phagocytosis">Phagocytose eines Bakteriums</option>
+          <option value="endosomalPathway">Endocytose über frühes und spätes Endosom</option>
+          <option value="autophagy">Autophagie beschädigter Organellen</option>
+          <option value="roughERProtein">Raues ER: Proteinsynthese und Faltung</option>
+          <option value="smoothERLipids">Glattes ER: Lipid- und Steroidbiosynthese</option>
+          <option value="erCalcium">Glattes ER: Calcium-Speicherung und -Freisetzung</option>
+          <option value="erDetox">Glattes ER: Entgiftung</option>
+          <option value="ribosomeTranslation">Translation am Ribosom</option>
+          <option value="cytoskeletalTransport">Vesikeltransport am Cytoskelett</option>
+          <option value="vesicleTransport">Vesikeltransport vom ER zum Golgi</option>
+          <option value="peroxisomeOxidation">Peroxisom: Fettsäureabbau und Entgiftung</option>
+          <option value="motorProteinTransport">Kinesin: schrittweiser Transport</option>
+          <option value="endocytosis">Endocytose</option>
+          <option value="exocytosis">Exocytose</option>
+          <option value="membraneTransport">Kanal- und Carriertransport</option>
+          <option value="paracrineSignal">Parakrine Signalübertragung an eine Nachbarzelle</option>
+          <option value="gapJunctionTransport">Stoffaustausch durch Gap Junctions</option>
+        </select>
+      </label>
+      <p id="explore-help" hidden aria-live="polite">WASD bewegen · Q/E hoch/runter · Maus ziehen zum Umsehen · Shift schneller</p>
+    </section>
+    <aside id="detail-panel" class="detail-panel" role="dialog" aria-modal="false" aria-labelledby="detail-title" hidden>
+      <p class="eyebrow">Organell im Fokus</p>
+      <h2 id="detail-title"></h2>
+      <h3>Aufbau</h3>
+      <p id="detail-structure"></p>
+      <h3>Funktion</h3>
+      <p id="detail-function"></p>
+      <div class="fact-grid" aria-label="Größenangaben">
+        <div class="fact"><span>Typische Größe</span><strong id="detail-size"></strong></div>
+        <div class="fact"><span>Anteil am Zellvolumen</span><strong id="detail-volume"></strong></div>
+      </div>
+      <p class="estimate-note">Grobe Richtwerte: Größe und Volumenanteil hängen stark von Zelltyp und Aktivität ab; die Anteile sind nicht exakt addierbar.</p>
+      <section class="animation-note" aria-labelledby="process-title">
+        <span class="animation-indicator" aria-hidden="true"></span>
+        <div>
+          <h3 id="process-title">Funktion im 3D-Modell</h3>
+          <p id="process-caption"></p>
+        </div>
+      </section>
+      <button id="close-detail" type="button">Zur ganzen Zelle</button>
+    </aside>
+    <p id="error" class="error" role="alert" hidden></p>
+  </main>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
+      }
+    }
+  </script>
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js" crossorigin>
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/controls/OrbitControls.js" crossorigin>
+  <script type="module">
+    const errorElement = document.querySelector("#error");
+
+    try {
+      const THREE = await import("three");
+      const { OrbitControls } = await import("three/addons/controls/OrbitControls.js");
+      const sharedGeometryCache = new Map();
+      function getSharedGeometry(GeometryType, ...parameters) {
+        const key = `${GeometryType.name}:${parameters.join(",")}`;
+        let geometry = sharedGeometryCache.get(key);
+        if (!geometry) {
+          geometry = new GeometryType(...parameters);
+          sharedGeometryCache.set(key, geometry);
+        }
+        return geometry;
+      }
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xedf4fb);
+      const camera = new THREE.PerspectiveCamera(
+        45,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        100
+      );
+      const initialCameraPosition = new THREE.Vector3(0, 0.75, 3.3);
+      camera.position.copy(initialCameraPosition);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.domElement.tabIndex = 0;
+      renderer.domElement.setAttribute("aria-label", "3D-Zelle: Mausziehen zum Drehen, Mausrad zum Zoomen");
+      document.querySelector(".viewer").appendChild(renderer.domElement);
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.enablePan = true;
+      controls.screenSpacePanning = true;
+      controls.panSpeed = 1.1;
+      controls.target.set(0, 0, 0);
+      controls.minDistance = 0.15;
+      controls.maxDistance = 8;
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x66728a, 2));
+      const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+      keyLight.position.set(4, 5, 6);
+      scene.add(keyLight);
+      const fillLight = new THREE.PointLight(0xb9d8ff, 18, 8);
+      fillLight.position.set(-3, -1, 3);
+      scene.add(fillLight);
+
+      const cell = new THREE.Group();
+      scene.add(cell);
+      const interactiveMeshes = [];
+      const focusAnchors = {};
+
+      const details = {
+        membrane: {
+          name: "Zellmembran",
+          structure: "Eine Phospholipid-Doppelschicht mit hydrophilen Köpfen nach außen und hydrophoben Schwänzen nach innen. Eingelagerte Kanal-, Carrier- und Rezeptorproteine übernehmen Transport und Signalaufnahme.",
+          function: "Sie grenzt die Zelle ab und reguliert, welche Stoffe hinein- und hinausgelangen. Rezeptorproteine nehmen außerdem Signale aus der Umgebung auf.",
+          size: "ca. 7–10 nm dick",
+          volume: "<1 %",
+          caption: "Leuchtende Teilchen passieren ein Transportprotein und zeigen den kontrollierten Stoffaustausch."
+        },
+        cytoplasm: {
+          name: "Cytoplasma",
+          structure: "Das Cytoplasma umfasst Cytosol und die darin eingebetteten Zellbestandteile. Im wässrigen Cytosol liegen Ionen, kleine Metabolite, lösliche Enzyme und Proteasen. Proteasomen sind große Proteinkomplexe, die markierte Proteine abbauen. Im Modell stehen Blau für Ionen, Gelb für Metabolite, Grün für Enzyme und violette Zylinder für Proteasomen; alles ist schematisch und nicht maßstabsgetreu.",
+          function: "Das Cytosol ist Reaktions- und Transportmedium der Zelle. Gelöste Stoffe diffundieren darin; Enzyme katalysieren Stoffwechselreaktionen und Proteasomen recyceln bestimmte Proteine.",
+          size: "Kein fester Durchmesser",
+          volume: "Je nach Zelltyp unterschiedlich",
+          caption: "Ionen und Metabolite diffundieren im Cytosol; Proteasomen zerlegen ausgewählte Proteine."
+        },
+        nucleus: {
+          name: "Zellkern",
+          structure: "Eine innere und äußere Kernmembran bilden die doppelte Kernhülle; die äußere geht in das ER über. Kernporenkomplexe kontrollieren den Austausch. Unter der inneren Membran liegt die Kernlamina. Das Erbgut liegt als DNA-Protein-Komplex (Chromatin) vor; der Nucleolus bildet Ribosomen-Bausteine.",
+          function: "Der Zellkern speichert die DNA und steuert über die Genaktivität viele Vorgänge der Zelle. Im Nucleolus werden Bestandteile der Ribosomen hergestellt.",
+          size: "ca. 5–10 µm Durchmesser",
+          volume: "ca. 5–15 %",
+          caption: "Ein leuchtender mRNA-Strang wird durch eine Kernpore ins Cytoplasma transportiert."
+        },
+        mitochondria: {
+          name: "Mitochondrien",
+          structure: "Die äußere Membran umschließt den Intermembranraum und die stark gefaltete innere Membran. Ihre Einstülpungen heißen Cristae. In der Matrix liegen Enzyme, eigene ringförmige DNA und Ribosomen. Atmungskette und ATP-Synthase sitzen in der inneren Membran. Außenmembran, Zwischenraum, Innenmembran und Matrix sind farblich getrennt; feine Strukturen sind zur Sichtbarkeit vergrößert.",
+          function: "Der Citratzyklus läuft in der Matrix. Die Atmungskette überträgt Elektronen auf Sauerstoff und pumpt Protonen in den Intermembranraum; ihr Rückstrom durch die ATP-Synthase treibt die ATP-Bildung an.",
+          size: "ca. 0,5–1 µm breit; 1–10 µm lang",
+          volume: "ca. 5–20 %",
+          caption: "Elektronen laufen entlang der Atmungskette; Protonen werden gepumpt und strömen durch die ATP-Synthase zurück."
+        },
+        er: {
+          name: "Endoplasmatisches Retikulum",
+          structure: "Ein zusammenhängendes, einfach membranumhülltes Netzwerk aus Röhren und Zisternen, das mit der äußeren Kernmembran verbunden ist. Am rauen ER sitzen Ribosomen auf der Cytosol-Seite; das glatte ER ist ribosomenfrei. Im Modell sind die Ribosomen am rauen ER dunkelblau und gut sichtbar, während das glatte ER als verzweigtes, helleres Röhrennetz dargestellt ist.",
+          function: "Am rauen ER werden sekretorische, lysosomale und Membranproteine synthetisiert, in das ER-Lumen eingeschleust, gefaltet und kontrolliert. Das glatte ER synthetisiert Membranlipide und Steroide, speichert und reguliert Calcium und unterstützt in bestimmten Zelltypen die Entgiftung.",
+          size: "Tubuli meist ca. 30–100 nm breit",
+          volume: "ca. 5–15 %",
+          caption: "Raues ER mit Ribosomen stellt Proteine her; das ribosomenfreie glatte ER übernimmt unter anderem Lipid- und Steroidbiosynthese."
+        },
+        golgi: {
+          name: "Golgi-Apparat",
+          structure: "Der Stapel besteht aus einzelnen, flachen, membranumhüllten Zisternen mit eigenem Innenraum und angedeuteten Enzymen. Das cis-Golgi-Netzwerk nimmt Vesikel vom ER auf; das trans-Golgi-Netzwerk sortiert Fracht und gibt Vesikel ab. Ein eigener Sekretionsweg zeigt den Transport zur Zellmembran und die Abgabe nach außen.",
+          function: "Er verändert, sortiert und verpackt Proteine und Lipide. Sekretorische Vesikel transportieren Fracht zur Zellmembran, fusionieren mit ihr und geben ihren Inhalt in den Extrazellularraum ab.",
+          size: "meist ca. 1–3 µm breit",
+          volume: "ca. 1–3 %",
+          caption: "Sekretorische Vesikel bewegen sich vom trans-Golgi zur Zellmembran und geben ihre Fracht durch Exocytose nach außen ab."
+        },
+        ribosomes: {
+          name: "Ribosomen",
+          structure: "Kleine, nicht von einer Membran umschlossene Partikel aus ribosomaler RNA und Proteinen. Sie liegen frei im Cytoplasma oder am rauen ER.",
+          function: "Ribosomen übersetzen die Information der mRNA in eine Aminosäurekette und bauen so Proteine.",
+          size: "ca. 20–30 nm Durchmesser",
+          volume: "<1 % (typischer Richtwert)",
+          caption: "Aminosäuren verbinden sich zu einer wachsenden Proteinkette direkt am Ribosom."
+        },
+        lysosomes: {
+          name: "Lysosomen",
+          structure: "Einfach membranumhüllte Bläschen mit sauren Hydrolasen. V-Typ-ATPase-Pumpen halten das Lumen bei etwa pH 4,5–5. Phagosomen aus der Phagocytose und Endosomen aus der Endocytose besitzen eine Einzelmembran; Autophagosomen umschließen Zellbestandteile dagegen zunächst mit einer Doppelmembran.",
+          function: "Lysosomen verdauen Bakterien nach der Phagocytose, aufgenommene Stoffe nach der Reifung vom frühen zum späten Endosom sowie zelleigene Bestandteile nach der Fusion mit Autophagosomen.",
+          size: "ca. 0,1–1 µm Durchmesser",
+          volume: "ca. 1–5 %",
+          caption: "Je nach Weg gelangt Fracht als Phagosom, spätes Endosom oder doppelmembraniges Autophagosom zum Lysosom."
+        },
+        cytoskeleton: {
+          name: "Cytoskelett",
+          structure: "Ein dynamisches Gerüst aus Mikrotubuli (hohle Röhren aus Tubulin), Aktinfilamenten und Intermediärfilamenten. Die Filamenttypen sind farblich unterschieden und zur Sichtbarkeit vergrößert; die Transportbahnen verlaufen im Modell um den Golgi-Stapel herum.",
+          function: "Es stabilisiert die Zellform, organisiert den Innenraum und ermöglicht Bewegung sowie gerichteten Vesikeltransport. Filamente werden fortlaufend auf- und abgebaut.",
+          size: "ca. 7–25 nm Filamentbreite",
+          volume: "Kein fester Anteil",
+          caption: "Ein Transportvesikel folgt einer Mikrotubuli-Bahn durch das Cytoplasma."
+        },
+        vesicles: {
+          name: "Transportvesikel",
+          structure: "Kleine Bläschen mit einer einzelnen Lipiddoppelschicht als Hülle. Ihre Fracht kann Proteine, Lipide oder Enzyme enthalten; spezifische Hüll- und Andockproteine steuern den Transport.",
+          function: "Vesikel schnüren sich am ER oder Golgi ab und verschmelzen am Ziel mit einer Membran. So werden Stoffe sortiert, transportiert und gezielt abgegeben.",
+          size: "häufig ca. 50–200 nm",
+          volume: "Variabel, meist wenige %",
+          caption: "Ein Vesikel transportiert Fracht vom ER zum Golgi und weiter zu seinem Ziel."
+        },
+        peroxisomes: {
+          name: "Peroxisomen",
+          structure: "Einfach membranumhüllte Organellen mit oxidativen Enzymen. Katalase baut das bei Reaktionen entstehende Wasserstoffperoxid ab; der dichte Kern ist im Modell angedeutet.",
+          function: "Sie bauen unter anderem sehr langkettige Fettsäuren ab und entgiften bestimmte Stoffe. Ihre Enzyme kontrollieren dabei reaktive Sauerstoffverbindungen.",
+          size: "ca. 0,1–1 µm Durchmesser",
+          volume: "<1 % (typischer Richtwert)",
+          caption: "Enzymreaktionen werden im Peroxisom gebündelt; Katalase entschärft Wasserstoffperoxid."
+        },
+        motorProteins: {
+          name: "Motorproteine",
+          structure: "Kinesine und Dyneine besitzen zwei bewegliche Bindungsköpfe, einen Stiel und eine Cargo-Bindestelle. Sie laufen schrittweise auf Mikrotubuli; Aktin-Myosine sind ein weiteres Motorprotein-System.",
+          function: "Unter ATP-Verbrauch bewegen sie Vesikel und andere Fracht entlang des Cytoskeletts. Kinesin läuft meist zum Plus-Ende, Dynein meist zum Minus-Ende eines Mikrotubulus.",
+          size: "ca. 10–100 nm",
+          volume: "Kein sinnvoller Volumenanteil",
+          caption: "Ein Kinesin-Motor macht Schritte entlang eines Mikrotubulus und zieht ein Vesikel mit."
+        }
+      };
+
+      const organelleList = document.querySelector("#organelle-list");
+      const processSelect = document.querySelector("#process-select");
+      const processLabel = document.querySelector("#process-label");
+      const cellProcesses = {
+        glycolysis: {
+          focus: "cytoplasm",
+          title: "Glykolyse im Cytosol",
+          caption: "Ein Glucosemolekül wird zu zwei Pyruvatmolekülen abgebaut; netto entstehen zwei ATP und zwei NADH."
+        },
+        nuclearTranscription: {
+          focus: "nucleus",
+          title: "Transkription und mRNA-Export",
+          caption: "Im Zellkern wird ein Abschnitt der DNA in RNA abgeschrieben. Reife mRNA verlässt den Kern durch Kernporen und kann im Cytoplasma translatiert werden."
+        },
+        citricCycle: {
+          focus: "mitochondria",
+          title: "Citratzyklus in der Matrix",
+          caption: "Acetyl-CoA wird schrittweise oxidiert. Dabei entstehen CO₂, NADH, FADH₂ und GTP/ATP."
+        },
+        electronTransport: {
+          focus: "mitochondria",
+          title: "Elektronen- und Protonentransport",
+          caption: "Blaue Elektronen wandern zu Sauerstoff; ihre Energie pumpt türkis dargestellte Protonen in den Intermembranraum. Der Rückstrom treibt die ATP-Synthase an."
+        },
+        golgiSecretion: {
+          focus: "golgi",
+          title: "Golgi-Transport in den Extrazellularraum",
+          caption: "Eigene sekretorische Vesikel wandern vom trans-Golgi nach außen und geben ihre Fracht ab. Schematische Darstellung: Bei der Exocytose verschmilzt die Vesikelmembran tatsächlich mit der Zellmembran."
+        },
+        phagocytosis: {
+          focus: "lysosomes",
+          title: "Phagocytose: Bakterium zum Lysosom",
+          caption: "Die Zellmembran umschließt ein Bakterium in einem einfach membranumhüllten Phagosom. Dieses fusioniert mit dem Lysosom zum Phagolysosom, in dem das Bakterium enzymatisch abgebaut wird."
+        },
+        endosomalPathway: {
+          focus: "lysosomes",
+          title: "Endocytose: frühes und spätes Endosom",
+          caption: "Aufgenommene Fracht gelangt in einem einfach membranumhüllten Vesikel zum frühen Endosom. Dieses reift zum späten Endosom und fusioniert anschließend mit dem Lysosom zur Verdauung."
+        },
+        autophagy: {
+          focus: "lysosomes",
+          title: "Autophagie: Organelle zum Lysosom",
+          caption: "Eine Isolationsmembran umschließt eine beschädigte Organelle und schließt sich zum doppelmembranigen Autophagosom. Nach der Fusion mit dem Lysosom werden Fracht und innere Membran abgebaut."
+        },
+        roughERProtein: {
+          focus: "er",
+          title: "Raues ER: Proteinsynthese und Faltung",
+          caption: "Ribosomen synthetisieren Proteine am rauen ER und schleusen viele davon während der Herstellung ins ER-Lumen ein. Dort beginnen Faltung und Qualitätskontrolle; geeignete Proteine werden in Vesikeln zum Golgi transportiert."
+        },
+        smoothERLipids: {
+          focus: "er",
+          title: "Glattes ER: Lipid- und Steroidbiosynthese",
+          caption: "Enzyme in der Membran des glatten ER bauen Lipide auf und um. In steroidbildenden Zellen ist das ER zusammen mit Mitochondrien an der Steroidhormonsynthese beteiligt."
+        },
+        erCalcium: {
+          focus: "er",
+          title: "Glattes ER: Calcium-Speicher",
+          caption: "Calciumpumpen transportieren Ca²⁺ ins ER-Lumen. Bei einem Signal wird Calcium kontrolliert freigesetzt und wirkt als Botenstoff im Cytosol."
+        },
+        erDetox: {
+          focus: "er",
+          title: "Glattes ER: Entgiftung",
+          caption: "Membranständige Enzyme, etwa Cytochrom-P450-Systeme, verändern bestimmte fettlösliche Stoffe. Die Produkte können dadurch weiter abgebaut oder ausgeschieden werden; die Bedeutung hängt vom Zelltyp ab."
+        },
+        ribosomeTranslation: {
+          focus: "ribosomes",
+          title: "Translation am Ribosom",
+          caption: "Das Ribosom liest mRNA in Dreiergruppen. Passende tRNAs liefern Aminosäuren, die zu einer Polypeptidkette verknüpft werden."
+        },
+        cytoskeletalTransport: {
+          focus: "cytoskeleton",
+          title: "Vesikeltransport am Cytoskelett",
+          caption: "Motorproteine bewegen Vesikel entlang von Mikrotubuli oder Aktinfilamenten. Die Filamentbahnen geben Richtung und Ziel des intrazellulären Transports vor."
+        },
+        vesicleTransport: {
+          focus: "vesicles",
+          title: "Vesikeltransport vom ER zum Golgi",
+          caption: "Transportvesikel knospen am ER ab und liefern ihre Fracht durch Membranfusion an den Golgi. Erkennungs- und Andockproteine helfen bei der Zielsteuerung."
+        },
+        peroxisomeOxidation: {
+          focus: "peroxisomes",
+          title: "Peroxisom: Fettsäureabbau und Entgiftung",
+          caption: "Oxidative Enzyme bauen unter anderem sehr langkettige Fettsäuren ab. Dabei entstehendes Wasserstoffperoxid wird durch Katalase zu Wasser und Sauerstoff umgesetzt."
+        },
+        motorProteinTransport: {
+          focus: "motorProteins",
+          title: "Kinesin: schrittweiser Transport",
+          caption: "Kinesin bindet ATP und setzt seine zwei Motorköpfe abwechselnd auf den Mikrotubulus. So bewegt es gebundene Fracht meist in Richtung des Plus-Endes."
+        },
+        endocytosis: {
+          focus: "membrane",
+          tissue: true,
+          title: "Endocytose",
+          caption: "Die Membran stülpt sich um Fracht nach innen ein und schnürt ein Transportvesikel ab."
+        },
+        exocytosis: {
+          focus: "membrane",
+          tissue: true,
+          title: "Exocytose",
+          caption: "Ein Vesikel fusioniert mit der Zellmembran und gibt seine Fracht nach außen ab."
+        },
+        membraneTransport: {
+          focus: "membrane",
+          tissue: true,
+          title: "Kanal- und Carriertransport",
+          caption: "Selektive Membranproteine lassen passende Stoffe passieren; Carrier ändern dafür ihre Form."
+        },
+        paracrineSignal: {
+          focus: "membrane",
+          tissue: true,
+          globalAnimation: true,
+          title: "Parakrine Kommunikation",
+          caption: "Eine Zelle gibt ein Signalmolekül in die interstitielle Flüssigkeit ab. Es diffundiert zur Nachbarzelle und bindet dort an einen passenden Rezeptor. Welche Zellen reagieren, hängt vom Rezeptor ab."
+        },
+        gapJunctionTransport: {
+          focus: "membrane",
+          tissue: true,
+          globalAnimation: true,
+          title: "Austausch durch Gap Junctions",
+          caption: "Connexin-Kanäle verbinden benachbarte Zellen direkt und lassen Ionen sowie kleine Moleküle passieren. Gap Junctions kommen nicht in allen Zelltypen oder Geweben vor."
+        }
+      };
+      function updateProcessOptions(focusId = null) {
+        for (const option of processSelect.options) {
+          option.hidden = Boolean(
+            option.value &&
+            focusId &&
+            cellProcesses[option.value]?.focus !== focusId
+          );
+        }
+      }
+
+      for (const [id, info] of Object.entries(details)) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = info.name;
+        button.dataset.organelle = id;
+        button.setAttribute("aria-pressed", "false");
+        button.addEventListener("click", () => {
+          if (tissueMode) setTissueMode(false);
+          processSelect.value = "";
+          focusOrganelle(id);
+        });
+        organelleList.appendChild(button);
+      }
+
+      function markPickable(root, id) {
+        root.traverse((object) => {
+          if (object.isMesh) {
+            object.userData.organelleId = id;
+            object.userData.organelleAnchor = root;
+            interactiveMeshes.push(object);
+          }
+        });
+      }
+
+      const membrane = new THREE.Mesh(
+        getSharedGeometry(THREE.SphereGeometry, 1, 72, 56),
+        new THREE.MeshPhysicalMaterial({
+          color: 0x4da6ff,
+          transparent: true,
+          opacity: 0.2,
+          roughness: 0.35,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        })
+      );
+      membrane.scale.set(1.25, 0.85, 0.9);
+      membrane.renderOrder = 2;
+      cell.add(membrane);
+      const innerMembrane = new THREE.Mesh(
+        getSharedGeometry(THREE.SphereGeometry, 1, 56, 44),
+        new THREE.MeshStandardMaterial({
+          color: 0x78b5f2,
+          transparent: true,
+          opacity: 0.11,
+          side: THREE.BackSide,
+          depthWrite: false
+        })
+      );
+      innerMembrane.scale.set(1.22, 0.83, 0.87);
+      innerMembrane.renderOrder = 2;
+      cell.add(innerMembrane);
+      const membraneProteins = new THREE.Group();
+      const membraneProteinMaterial = new THREE.MeshStandardMaterial({
+        color: 0x2d679f,
+        roughness: 0.35
+      });
+      for (const [x, y, z] of [
+        [-0.62, 0.2, 0.69], [0.55, 0.3, 0.68],
+        [-0.72, -0.22, 0.61], [0.68, -0.28, 0.62]
+      ]) {
+        const channel = new THREE.Mesh(
+          getSharedGeometry(THREE.CylinderGeometry, 0.026, 0.026, 0.12, 12),
+          membraneProteinMaterial
+        );
+        channel.position.set(x, y, z);
+        channel.rotation.x = Math.PI / 2;
+        membraneProteins.add(channel);
+      }
+      cell.add(membraneProteins);
+      markPickable(membraneProteins, "membrane");
+      const membraneAnchor = new THREE.Object3D();
+      membraneAnchor.position.set(0, 0, 0.82);
+      cell.add(membraneAnchor);
+      focusAnchors.membrane = membraneAnchor;
+      markPickable(membrane, "membrane");
+
+      const cytoplasm = new THREE.Mesh(
+        getSharedGeometry(THREE.SphereGeometry, 1, 48, 36),
+        new THREE.MeshStandardMaterial({
+          color: 0xc9f0d7,
+          transparent: true,
+          opacity: 0.12,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        })
+      );
+      cytoplasm.scale.set(1.2, 0.8, 0.85);
+      cytoplasm.renderOrder = 1;
+      cell.add(cytoplasm);
+
+      const cytosolParticles = new THREE.Group();
+      cell.add(cytosolParticles);
+      const cytosolParticleGeometry = getSharedGeometry(THREE.SphereGeometry, 1, 8, 6);
+      const cytosolParticleMaterials = [
+        new THREE.MeshStandardMaterial({ color: 0x55a8d7, emissive: 0x12354b, roughness: 0.45 }),
+        new THREE.MeshStandardMaterial({ color: 0xf0c15a, emissive: 0x503407, roughness: 0.48 }),
+        new THREE.MeshStandardMaterial({ color: 0x67b47d, emissive: 0x173c25, roughness: 0.5 })
+      ];
+      const cytosolParticleInstances = cytosolParticleMaterials.map((material) => {
+        const instances = new THREE.InstancedMesh(cytosolParticleGeometry, material, 64);
+        instances.count = 0;
+        instances.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+        cytosolParticles.add(instances);
+        return instances;
+      });
+      const particleTransform = new THREE.Object3D();
+      const particleCount = 64;
+      for (let i = 0; i < particleCount; i++) {
+        const inclination = Math.acos(1 - 2 * (i + 0.5) / particleCount);
+        const angle = i * 2.399963229728653;
+        const radius = 0.22 + 0.66 * ((i * 0.618033988749895) % 1);
+        const radial = Math.sin(inclination) * radius;
+        const x = 1.05 * radial * Math.cos(angle);
+        const y = 0.68 * Math.cos(inclination) * radius;
+        const z = 0.74 * radial * Math.sin(angle);
+        const nuclearDistance =
+          ((x + 0.12) / 0.34) ** 2 +
+          ((y - 0.02) / 0.33) ** 2 +
+          ((z - 0.02) / 0.31) ** 2;
+        if (nuclearDistance < 1.2) continue;
+
+        const instance = cytosolParticleInstances[i % cytosolParticleInstances.length];
+        particleTransform.position.set(x, y, z);
+        particleTransform.scale.setScalar(i % 3 === 0 ? 0.006 : i % 3 === 1 ? 0.009 : 0.012);
+        particleTransform.updateMatrix();
+        instance.setMatrixAt(instance.count, particleTransform.matrix);
+        instance.count++;
+      }
+      cytosolParticleInstances.forEach((instances) => {
+        instances.instanceMatrix.needsUpdate = true;
+      });
+
+      const proteasomeBodyMaterial = new THREE.MeshStandardMaterial({
+        color: 0x7867a9,
+        roughness: 0.4
+      });
+      const proteasomeCapMaterial = new THREE.MeshStandardMaterial({
+        color: 0xe6ca77,
+        roughness: 0.38
+      });
+      const proteasomeRingGeometry = getSharedGeometry(THREE.TorusGeometry, 0.019, 0.0025, 6, 16);
+      for (const [x, y, z] of [
+        [-0.66, 0.18, 0.4], [0.82, -0.16, 0.17], [0.22, -0.57, -0.28]
+      ]) {
+        const proteasome = new THREE.Group();
+        proteasome.position.set(x, y, z);
+        proteasome.add(new THREE.Mesh(
+          getSharedGeometry(THREE.CylinderGeometry, 0.018, 0.018, 0.045, 12),
+          proteasomeBodyMaterial
+        ));
+        for (const end of [-1, 1]) {
+          const cap = new THREE.Mesh(
+            getSharedGeometry(THREE.CylinderGeometry, 0.015, 0.015, 0.006, 12),
+            proteasomeCapMaterial
+          );
+          cap.position.y = end * 0.025;
+          proteasome.add(cap);
+        }
+        for (const level of [-0.016, -0.005, 0.005, 0.016]) {
+          const ring = new THREE.Mesh(proteasomeRingGeometry, proteasomeCapMaterial);
+          ring.rotation.x = Math.PI / 2;
+          ring.position.y = level;
+          proteasome.add(ring);
+        }
+        proteasome.scale.setScalar(0.8);
+        cytosolParticles.add(proteasome);
+      }
+
+      const cytoplasmAnchor = new THREE.Object3D();
+      cytoplasmAnchor.position.set(-0.64, 0.16, 0.48);
+      cell.add(cytoplasmAnchor);
+      focusAnchors.cytoplasm = cytoplasmAnchor;
+
+      const nucleus = new THREE.Group();
+      nucleus.position.set(-0.12, 0.02, 0.02);
+      cell.add(nucleus);
+      const nuclearEnvelope = new THREE.Mesh(
+        getSharedGeometry(THREE.SphereGeometry, 0.29, 48, 36),
+        new THREE.MeshPhysicalMaterial({
+          color: 0xf28b91,
+          transparent: true,
+          opacity: 0.24,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        })
+      );
+      nucleus.add(nuclearEnvelope);
+      const innerNuclearMembrane = new THREE.Mesh(
+        getSharedGeometry(THREE.SphereGeometry, 0.274, 48, 36),
+        new THREE.MeshPhysicalMaterial({
+          color: 0xffc7cf,
+          transparent: true,
+          opacity: 0.32,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        })
+      );
+      innerNuclearMembrane.renderOrder = 2;
+      nucleus.add(innerNuclearMembrane);
+      const nucleusInterior = new THREE.Mesh(
+        getSharedGeometry(THREE.SphereGeometry, 0.255, 40, 32),
+        new THREE.MeshStandardMaterial({
+          color: 0xf5a0a5,
+          roughness: 0.48,
+          transparent: true,
+          opacity: 0.68,
+          depthWrite: false
+        })
+      );
+      nucleus.add(nucleusInterior);
+      nucleusInterior.renderOrder = 1;
+      const nuclearLamina = new THREE.Mesh(
+        getSharedGeometry(THREE.SphereGeometry, 0.261, 16, 12),
+        new THREE.MeshBasicMaterial({
+          color: 0x8e4760,
+          transparent: true,
+          opacity: 0.24,
+          wireframe: true,
+          depthWrite: false
+        })
+      );
+      nuclearLamina.renderOrder = 2;
+      nucleus.add(nuclearLamina);
+      const nucleolus = new THREE.Mesh(
+        getSharedGeometry(THREE.SphereGeometry, 0.075, 24, 20),
+        new THREE.MeshStandardMaterial({ color: 0x9f3547, roughness: 0.38 })
+      );
+      nucleolus.position.set(0.045, 0.035, 0.15);
+      nucleus.add(nucleolus);
+      const chromatinMaterial = new THREE.MeshBasicMaterial({
+        color: 0x9b3655,
+        depthTest: false
+      });
+      for (let strand = 0; strand < 4; strand++) {
+        const offset = (strand - 1.5) * 0.07;
+        const chromatinPath = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(-0.15, offset, 0.255),
+          new THREE.Vector3(-0.08, offset + 0.06, 0.265),
+          new THREE.Vector3(0.02, offset - 0.025, 0.27),
+          new THREE.Vector3(0.11, offset + 0.035, 0.25)
+        ]);
+        const chromatinStrand = new THREE.Mesh(
+          new THREE.TubeGeometry(chromatinPath, 20, 0.009, 6, false),
+          chromatinMaterial
+        );
+        chromatinStrand.renderOrder = 3;
+        nucleus.add(chromatinStrand);
+      }
+      const poreMaterial = new THREE.MeshStandardMaterial({ color: 0x9c586b });
+      const poreRingMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffe3e7,
+        emissive: 0x49202d,
+        roughness: 0.35
+      });
+      for (let i = 0; i < 7; i++) {
+        const angle = (i / 6) * Math.PI - Math.PI / 2;
+        const x = Math.cos(angle) * 0.18;
+        const y = Math.sin(angle) * 0.14;
+        const pore = new THREE.Group();
+        pore.position.set(x, y, 0.19);
+        const channel = new THREE.Mesh(
+          getSharedGeometry(THREE.CylinderGeometry, 0.012, 0.012, 0.07, 10),
+          poreMaterial
+        );
+        channel.rotation.x = Math.PI / 2;
+        nucleus.add(pore);
+        pore.add(channel);
+        const ring = new THREE.Mesh(
+          getSharedGeometry(THREE.TorusGeometry, 0.022, 0.006, 6, 16),
+          poreRingMaterial
+        );
+        pore.add(ring);
+      }
+      markPickable(nucleus, "nucleus");
+      focusAnchors.nucleus = nucleus;
+
+      const mitochondriaMaterial = new THREE.MeshStandardMaterial({
+        color: 0xd95732,
+        roughness: 0.48,
+        transparent: true,
+        opacity: 0.52,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const outerMembraneInnerMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffb36b,
+        roughness: 0.45,
+        transparent: true,
+        opacity: 0.46,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const intermembraneSpaceMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0x9b6b91,
+        transparent: true,
+        opacity: 0.2,
+        roughness: 0.38,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const innerMembraneMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffdf8d,
+        roughness: 0.4,
+        transparent: true,
+        opacity: 0.68,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const innerMembraneInnerMaterial = new THREE.MeshStandardMaterial({
+        color: 0xe98642,
+        roughness: 0.42,
+        transparent: true,
+        opacity: 0.56,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const mitochondriaInnerMaterial = new THREE.MeshStandardMaterial({
+        color: 0xf6c982,
+        roughness: 0.55
+      });
+      const cristaeMaterial = new THREE.MeshBasicMaterial({
+        color: 0xe87555,
+        depthTest: false,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+      const respiratoryComplexMaterials = [0x4e83b6, 0x648fbc, 0x8a78ae]
+        .map((color) => new THREE.MeshStandardMaterial({
+          color,
+          emissive: 0x14283a,
+          roughness: 0.38
+        }));
+      const atpSynthaseHeadMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffe6a1,
+        emissive: 0x68420b,
+        roughness: 0.35
+      });
+      const atpSynthaseStemMaterial = new THREE.MeshStandardMaterial({
+        color: 0xf2bd4b,
+        roughness: 0.42
+      });
+      const mitochondrialDNAMaterial = new THREE.MeshBasicMaterial({
+        color: 0x82417e,
+        depthTest: false
+      });
+      const mitochondrialRibosomeMaterial = new THREE.MeshStandardMaterial({
+        color: 0x436d99,
+        roughness: 0.45
+      });
+      const mitochondriaPositions = [
+        [-0.78, 0.35, 0.25], [0.66, 0.37, 0.12], [0.78, -0.22, 0.3],
+        [-0.7, -0.36, 0.18], [0.42, 0.55, -0.26], [-0.35, 0.56, -0.34],
+        [0.05, -0.56, 0.34], [0.84, 0.05, -0.35], [-0.86, 0.02, -0.28],
+        [0.38, -0.42, -0.42], [-0.48, -0.48, -0.38], [0.1, 0.52, 0.42]
+      ];
+      let firstMitochondrion;
+      for (const [index, [x, y, z]] of mitochondriaPositions.entries()) {
+        const mitochondrion = new THREE.Group();
+        mitochondrion.position.set(x, y, z);
+        mitochondrion.rotation.set(
+          index === 0 ? 0 : Math.random() * Math.PI,
+          index === 0 ? 0.35 : Math.random() * Math.PI,
+          0
+        );
+        const outer = new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, 1, 24, 16),
+          mitochondriaMaterial
+        );
+        outer.scale.set(0.12, 0.068, 0.055);
+        mitochondrion.add(outer);
+        const outerInnerSurface = new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, 1, 24, 16),
+          outerMembraneInnerMaterial
+        );
+        outerInnerSurface.scale.set(0.115, 0.064, 0.052);
+        mitochondrion.add(outerInnerSurface);
+        const intermembraneSpace = new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, 1, 24, 16),
+          intermembraneSpaceMaterial
+        );
+        intermembraneSpace.scale.set(0.109, 0.061, 0.049);
+        mitochondrion.add(intermembraneSpace);
+        const innerMembrane = new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, 1, 20, 14),
+          innerMembraneMaterial
+        );
+        innerMembrane.scale.set(0.103, 0.058, 0.046);
+        mitochondrion.add(innerMembrane);
+        const innerMembraneInnerSurface = new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, 1, 20, 14),
+          innerMembraneInnerMaterial
+        );
+        innerMembraneInnerSurface.scale.set(0.097, 0.052, 0.043);
+        mitochondrion.add(innerMembraneInnerSurface);
+        const matrix = new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, 1, 20, 14),
+          mitochondriaInnerMaterial
+        );
+        matrix.scale.set(0.091, 0.047, 0.038);
+        mitochondrion.add(matrix);
+        const matrixSurfaceZ = (surfaceX, surfaceY) => {
+          const normalizedRadius =
+            (surfaceX / 0.091) ** 2 + (surfaceY / 0.047) ** 2;
+          return 0.038 * Math.sqrt(Math.max(0, 1 - normalizedRadius)) * 0.94;
+        };
+        for (let fold = 0; fold < 4; fold++) {
+          const yOffset = (fold - 1.5) * 0.016;
+          const vertices = [];
+          const indices = [];
+          const sampleCount = 33;
+          for (let pointIndex = 0; pointIndex < sampleCount; pointIndex++) {
+            const progress = pointIndex / (sampleCount - 1);
+            const x = (progress * 2 - 1) * 0.064;
+            const foldPhase = progress * Math.PI * 4 + fold * 0.55;
+            const centerY = yOffset + Math.sin(foldPhase) * 0.003;
+            const foldDepth = 0.002 + Math.abs(Math.sin(progress * Math.PI * 6 + fold * 0.55)) * 0.004;
+            for (const edge of [-1, 1]) {
+              const y = centerY + edge * 0.004;
+              vertices.push(x, y, matrixSurfaceZ(x, y) + 0.008 - foldDepth);
+            }
+            if (pointIndex < sampleCount - 1) {
+              const current = pointIndex * 2;
+              indices.push(current, current + 1, current + 2, current + 1, current + 3, current + 2);
+            }
+          }
+          const cristaGeometry = new THREE.BufferGeometry();
+          cristaGeometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+          cristaGeometry.setIndex(indices);
+          cristaGeometry.computeVertexNormals();
+          const crista = new THREE.Mesh(
+            cristaGeometry,
+            cristaeMaterial
+          );
+          crista.renderOrder = 10;
+          mitochondrion.add(crista);
+        }
+        for (let complex = 0; complex < respiratoryComplexMaterials.length; complex++) {
+          const x = (complex - 1) * 0.046;
+          const y = -0.03;
+          const membraneHeight = matrixSurfaceZ(x, y);
+          const base = new THREE.Mesh(
+            getSharedGeometry(THREE.CylinderGeometry, 0.005, 0.006, 0.015, 8),
+            respiratoryComplexMaterials[complex]
+          );
+          base.position.set(x, y, membraneHeight + 0.008);
+          base.rotation.x = Math.PI / 2;
+          mitochondrion.add(base);
+          const complexHead = new THREE.Mesh(
+            getSharedGeometry(THREE.SphereGeometry, 0.006, 10, 8),
+            respiratoryComplexMaterials[complex]
+          );
+          complexHead.position.set(x, y, membraneHeight + 0.012);
+          mitochondrion.add(complexHead);
+        }
+        for (let synthase = 0; synthase < 4; synthase++) {
+          const x = (synthase - 1.5) * 0.028;
+          const y = 0.03;
+          const membraneHeight = matrixSurfaceZ(x, y);
+          const stem = new THREE.Mesh(
+            getSharedGeometry(THREE.CylinderGeometry, 0.0035, 0.0035, 0.012, 8),
+            atpSynthaseStemMaterial
+          );
+          stem.position.set(x, y, membraneHeight + 0.01);
+          stem.rotation.x = Math.PI / 2;
+          mitochondrion.add(stem);
+          const head = new THREE.Mesh(
+            getSharedGeometry(THREE.SphereGeometry, 0.009, 12, 10),
+            atpSynthaseHeadMaterial
+          );
+          head.position.set(x, y, membraneHeight + 0.002);
+          mitochondrion.add(head);
+        }
+        const mitochondrialDNAPath = new THREE.CatmullRomCurve3(
+          Array.from({ length: 9 }, (_, index) => {
+            const angle = (index / 8) * Math.PI * 2;
+            return new THREE.Vector3(
+              Math.cos(angle) * 0.03,
+              Math.sin(angle) * 0.022,
+              0.014
+            );
+          }),
+          true
+        );
+        const mitochondrialDNA = new THREE.Mesh(
+          new THREE.TubeGeometry(mitochondrialDNAPath, 32, 0.0035, 5, true),
+          mitochondrialDNAMaterial
+        );
+        mitochondrialDNA.renderOrder = 3;
+        mitochondrion.add(mitochondrialDNA);
+        for (let i = 0; i < 3; i++) {
+          const mitochondrialRibosome = new THREE.Mesh(
+            getSharedGeometry(THREE.SphereGeometry, 0.007, 10, 8),
+            mitochondrialRibosomeMaterial
+          );
+          mitochondrialRibosome.position.set(-0.02 + i * 0.02, -0.015, 0.018);
+          mitochondrion.add(mitochondrialRibosome);
+        }
+        cell.add(mitochondrion);
+        markPickable(mitochondrion, "mitochondria");
+        firstMitochondrion = firstMitochondrion || mitochondrion;
+      }
+      focusAnchors.mitochondria = firstMitochondrion;
+
+      const er = new THREE.Group();
+      cell.add(er);
+      const roughERMaterial = new THREE.MeshStandardMaterial({ color: 0xc76889, roughness: 0.45 });
+      const smoothERMaterial = new THREE.MeshStandardMaterial({ color: 0xe9b58e, roughness: 0.45 });
+      const erLumenMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffe6ec,
+        emissive: 0x4a1f2c,
+        roughness: 0.4
+      });
+      const roughERPaths = [
+        [[-0.42, 0.02, 0.1], [-0.37, 0.2, 0.14], [-0.22, 0.34, 0.15], [-0.02, 0.39, 0.15]],
+        [[-0.4, -0.08, 0.1], [-0.35, -0.22, 0.16], [-0.18, -0.34, 0.16], [0.04, -0.37, 0.15]],
+        [[-0.36, 0.1, 0.04], [-0.22, 0.25, 0.08], [-0.04, 0.29, 0.1], [0.14, 0.23, 0.1]]
+      ];
+      const ribosomeMaterial = new THREE.MeshStandardMaterial({
+        color: 0x29466b,
+        roughness: 0.48
+      });
+      const ribosomeSubunitMaterial = new THREE.MeshStandardMaterial({
+        color: 0x668eb8,
+        roughness: 0.5
+      });
+      const ribosomeInstances = [];
+      const ribosomeLargeSubunitGeometry = getSharedGeometry(THREE.SphereGeometry, 1, 16, 12);
+      const ribosomeSmallSubunitGeometry = getSharedGeometry(THREE.SphereGeometry, 1, 14, 10);
+      function createRibosome() {
+        const ribosome = new THREE.Group();
+        const largeSubunit = new THREE.Mesh(
+          ribosomeLargeSubunitGeometry,
+          ribosomeMaterial
+        );
+        largeSubunit.scale.set(0.026, 0.018, 0.017);
+        largeSubunit.position.y = 0.008;
+        ribosome.add(largeSubunit);
+        const smallSubunit = new THREE.Mesh(
+          ribosomeSmallSubunitGeometry,
+          ribosomeSubunitMaterial
+        );
+        smallSubunit.scale.set(0.019, 0.012, 0.015);
+        smallSubunit.position.set(0, -0.012, 0.002);
+        ribosome.add(smallSubunit);
+        ribosomeInstances.push(ribosome);
+        return ribosome;
+      }
+      const smoothERPaths = [
+        [[0.08, 0.4, -0.24], [0.26, 0.36, -0.3], [0.4, 0.2, -0.34], [0.42, -0.02, -0.32]],
+        [[0.11, -0.39, -0.22], [0.29, -0.34, -0.29], [0.42, -0.2, -0.32], [0.45, 0.02, -0.29]],
+        [[-0.06, 0.28, -0.32], [0.13, 0.19, -0.39], [0.25, 0.02, -0.4], [0.2, -0.18, -0.37]],
+        [[0.28, 0.4, -0.25], [0.43, 0.48, -0.2], [0.52, 0.38, -0.12], [0.42, 0.2, -0.34]]
+      ];
+      const erContinuityPaths = [
+        [[-0.02, 0.39, 0.15], [-0.12, 0.48, 0.04], [-0.14, 0.44, -0.14], [-0.06, 0.28, -0.32]],
+        [[0.14, 0.23, 0.1], [0.26, 0.31, 0.02], [0.31, 0.38, -0.12], [0.28, 0.4, -0.25]]
+      ];
+      function addERPath(points, material, ribosomes = false) {
+        const path = new THREE.CatmullRomCurve3(
+          points.map(([x, y, z]) => new THREE.Vector3(x, y, z))
+        );
+        er.add(new THREE.Mesh(new THREE.TubeGeometry(path, 48, 0.022, 10, false), material));
+        er.add(new THREE.Mesh(
+          new THREE.TubeGeometry(path, 48, 0.008, 8, false),
+          erLumenMaterial
+        ));
+        if (ribosomes) {
+          for (let i = 1; i < 12; i++) {
+            const ribosome = createRibosome();
+            ribosome.position.copy(path.getPointAt(i / 13));
+            er.add(ribosome);
+            focusAnchors.ribosomes = focusAnchors.ribosomes || ribosome;
+          }
+        }
+      }
+      for (const points of roughERPaths) addERPath(points, roughERMaterial, true);
+      for (const points of smoothERPaths) addERPath(points, smoothERMaterial);
+      for (const points of erContinuityPaths) addERPath(points, smoothERMaterial);
+      markPickable(er, "er");
+      focusAnchors.er = er;
+
+      const golgi = new THREE.Group();
+      const golgiCisternae = [];
+      const golgiCisternaDimensions = [
+        [0.145, 0.077],
+        [0.156, 0.086],
+        [0.17, 0.094],
+        [0.159, 0.088],
+        [0.14, 0.075]
+      ];
+      const golgiLayerMaterials = [0xa86fc8, 0xb77bd2, 0xc28bdb, 0xb77bd2, 0xa86fc8]
+        .map((color) => new THREE.MeshStandardMaterial({
+          color,
+          roughness: 0.42,
+          transparent: true,
+          opacity: 0.82,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        }));
+      const golgiLumenMaterials = [0xe3c7f0, 0xe9d2f2, 0xf0dcf4, 0xe9d2f2, 0xe3c7f0]
+        .map((color) => new THREE.MeshStandardMaterial({ color, roughness: 0.5 }));
+      const golgiRimGeometry = getSharedGeometry(THREE.TorusGeometry, 0.145, 0.004, 6, 32);
+      const golgiEnzymeMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffe6a1,
+        emissive: 0x57400d,
+        roughness: 0.42
+      });
+      for (let i = 0; i < 5; i++) {
+        const [cisternaWidth, cisternaDepth] = golgiCisternaDimensions[i];
+        const cisterna = new THREE.Group();
+        cisterna.position.set(
+          0.53 + Math.cos(i * 0.8) * 0.008,
+          -0.12 + (i - 2) * 0.06,
+          0.38
+        );
+        cisterna.rotation.z = (i - 2) * 0.025;
+        const membrane = new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, 1, 32, 20),
+          golgiLayerMaterials[i]
+        );
+        membrane.scale.set(cisternaWidth, 0.023, cisternaDepth);
+        cisterna.add(membrane);
+        const lumen = new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, 1, 24, 16),
+          golgiLumenMaterials[i]
+        );
+        lumen.scale.set(cisternaWidth * 0.81, 0.008, cisternaDepth * 0.69);
+        lumen.position.set(0, 0.01, 0.014);
+        cisterna.add(lumen);
+        const rim = new THREE.Mesh(golgiRimGeometry, golgiLayerMaterials[i]);
+        rim.rotation.x = Math.PI / 2;
+        rim.scale.set(cisternaWidth / 0.145, cisternaDepth / 0.145, 1);
+        rim.position.set(0, 0.014, 0.012);
+        cisterna.add(rim);
+        for (let enzyme = 0; enzyme < 3; enzyme++) {
+          const enzymeParticle = new THREE.Mesh(
+            getSharedGeometry(THREE.SphereGeometry, 0.007, 8, 6),
+            golgiEnzymeMaterial
+          );
+          enzymeParticle.position.set(
+            (enzyme - 1) * 0.042,
+            0.02,
+            0.04 + (enzyme % 2) * 0.015
+          );
+          cisterna.add(enzymeParticle);
+        }
+        golgi.add(cisterna);
+        golgiCisternae.push({
+          group: cisterna,
+          basePosition: cisterna.position.clone(),
+          baseRotation: cisterna.rotation.z,
+          phase: i * 1.17
+        });
+      }
+      const golgiNetworkMaterial = new THREE.MeshStandardMaterial({
+        color: 0x9660b1,
+        roughness: 0.48
+      });
+      const golgiNetworkPaths = [
+        [[0.35, -0.23, 0.39], [0.3, -0.2, 0.43], [0.28, -0.12, 0.45], [0.31, -0.04, 0.43], [0.35, 0.01, 0.4]],
+        [[0.32, -0.16, 0.44], [0.27, -0.1, 0.47], [0.29, -0.02, 0.44]],
+        [[0.71, -0.23, 0.38], [0.77, -0.19, 0.35], [0.81, -0.12, 0.35], [0.78, -0.05, 0.38], [0.72, 0.01, 0.4]],
+        [[0.75, -0.18, 0.4], [0.82, -0.12, 0.43], [0.79, -0.04, 0.42]]
+      ];
+      for (const points of golgiNetworkPaths) {
+        const path = new THREE.CatmullRomCurve3(
+          points.map(([x, y, z]) => new THREE.Vector3(x, y, z))
+        );
+        golgi.add(new THREE.Mesh(
+          new THREE.TubeGeometry(path, 32, 0.007, 7, false),
+          golgiNetworkMaterial
+        ));
+      }
+      const vesicleMaterial = new THREE.MeshStandardMaterial({ color: 0xd5a2ec });
+      for (const [x, y, z, size] of [
+        [0.34, -0.02, 0.4, 0.035], [0.72, -0.19, 0.34, 0.04],
+        [0.28, -0.25, 0.3, 0.028], [0.75, -0.03, 0.42, 0.026]
+      ]) {
+        const vesicle = new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, size, 16, 12),
+          vesicleMaterial
+        );
+        vesicle.position.set(x, y, z);
+        golgi.add(vesicle);
+      }
+      cell.add(golgi);
+      markPickable(golgi, "golgi");
+      const golgiAnchor = new THREE.Object3D();
+      golgiAnchor.position.set(0.53, -0.12, 0.38);
+      cell.add(golgiAnchor);
+      focusAnchors.golgi = golgiAnchor;
+
+      const freeRibosomes = new THREE.Group();
+      const freeRibosomePositions = [
+        [-0.8, 0.22, 0.48], [-0.68, 0.08, 0.56], [-0.58, -0.18, 0.5],
+        [-0.4, 0.48, 0.32], [-0.22, -0.56, 0.36], [0.03, 0.58, 0.3],
+        [0.2, -0.5, 0.4], [0.35, 0.5, 0.28], [0.75, 0.2, 0.34],
+        [0.83, -0.35, 0.22], [-0.85, -0.3, 0.24], [0.6, -0.48, -0.2],
+        [-0.6, 0.42, -0.3], [0.05, 0.45, -0.48], [0.25, -0.3, -0.5]
+      ];
+      for (const [x, y, z] of freeRibosomePositions) {
+        const ribosome = createRibosome();
+        ribosome.position.set(x, y, z);
+        freeRibosomes.add(ribosome);
+      }
+      cell.add(freeRibosomes);
+      markPickable(freeRibosomes, "ribosomes");
+      for (const ribosome of ribosomeInstances) {
+        ribosome.traverse((object) => {
+          if (object.isMesh) {
+            object.userData.organelleId = "ribosomes";
+            object.userData.organelleAnchor = ribosome;
+          }
+        });
+      }
+      focusAnchors.ribosomes = focusAnchors.ribosomes || ribosomeInstances[0];
+
+      const lysosomes = new THREE.Group();
+      const lysosomeMaterial = new THREE.MeshStandardMaterial({
+        color: 0xe9c55d,
+        roughness: 0.5,
+        transparent: true,
+        opacity: 0.46,
+        depthWrite: false
+      });
+      const lysosomeCargoMaterial = new THREE.MeshStandardMaterial({
+        color: 0x9b622f,
+        emissive: 0x38200a,
+        roughness: 0.6
+      });
+      const lysosomeEnzymeMaterial = new THREE.MeshStandardMaterial({
+        color: 0xf3b24d,
+        emissive: 0x68400c,
+        roughness: 0.42
+      });
+      const lysosomePumpMaterial = new THREE.MeshStandardMaterial({
+        color: 0x537fa5,
+        emissive: 0x173b58,
+        roughness: 0.38
+      });
+      const lysosomePositions = [
+        [-0.85, -0.05, 0.4], [0.86, 0.28, -0.05], [0.65, -0.48, 0.16],
+        [-0.42, 0.55, 0.2], [0.08, -0.59, -0.25], [0.84, -0.06, -0.35]
+      ];
+      let firstLysosome;
+      const lysosomeVesicleGeometry = getSharedGeometry(THREE.SphereGeometry, 0.065, 20, 16);
+      const lysosomeCargoGeometry = getSharedGeometry(THREE.SphereGeometry, 0.012, 8, 6);
+      const lysosomePumpGeometry = getSharedGeometry(THREE.SphereGeometry, 0.009, 10, 8);
+      for (const [x, y, z] of lysosomePositions) {
+        const lysosome = new THREE.Group();
+        lysosome.position.set(x, y, z);
+        const vesicle = new THREE.Mesh(
+          lysosomeVesicleGeometry,
+          lysosomeMaterial
+        );
+        lysosome.add(vesicle);
+        for (let i = 0; i < 4; i++) {
+          const particle = new THREE.Mesh(
+            lysosomeCargoGeometry,
+            i % 2 === 0 ? lysosomeEnzymeMaterial : lysosomeCargoMaterial
+          );
+          const angle = (i / 4) * Math.PI * 2;
+          particle.position.set(Math.cos(angle) * 0.028, Math.sin(angle) * 0.025, 0.045);
+          lysosome.add(particle);
+        }
+        for (let i = 0; i < 5; i++) {
+          const angle = (i / 5) * Math.PI * 2;
+          const x = Math.cos(angle) * 0.052;
+          const y = Math.sin(angle) * 0.042;
+          const pump = new THREE.Mesh(
+            lysosomePumpGeometry,
+            lysosomePumpMaterial
+          );
+          pump.position.set(x, y, 0.065 * Math.sqrt(1 - (x * x + y * y) / (0.065 * 0.065)));
+          lysosome.add(pump);
+        }
+        cell.add(lysosome);
+        markPickable(lysosome, "lysosomes");
+        firstLysosome = firstLysosome || lysosome;
+      }
+      focusAnchors.lysosomes = firstLysosome;
+
+      const cytoskeleton = new THREE.Group();
+      cell.add(cytoskeleton);
+      const microtubuleMaterial = new THREE.MeshStandardMaterial({
+        color: 0x238f9b,
+        emissive: 0x073a43,
+        roughness: 0.4
+      });
+      const actinMaterial = new THREE.MeshStandardMaterial({
+        color: 0xe28b56,
+        roughness: 0.45
+      });
+      const intermediateMaterial = new THREE.MeshStandardMaterial({
+        color: 0x8c74bd,
+        roughness: 0.5
+      });
+      const transportTrack = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-0.48, 0.2, 0.23),
+        new THREE.Vector3(-0.25, 0.14, 0.28),
+        new THREE.Vector3(-0.06, 0.13, 0.45),
+        new THREE.Vector3(0.12, 0.14, 0.55),
+        new THREE.Vector3(0.29, 0.12, 0.56),
+        new THREE.Vector3(0.32, -0.02, 0.54),
+        new THREE.Vector3(0.3, -0.1, 0.52)
+      ]);
+      const secretoryTrack = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0.76, -0.12, 0.52),
+        new THREE.Vector3(0.82, -0.03, 0.49),
+        new THREE.Vector3(0.91, 0.04, 0.41),
+        new THREE.Vector3(1.02, 0.12, 0.31),
+        new THREE.Vector3(1.12, 0.18, 0.22)
+      ]);
+      const transportRoutes = [transportTrack, secretoryTrack];
+      const microtubulePaths = [
+        transportTrack,
+        secretoryTrack,
+        new THREE.CatmullRomCurve3([
+          new THREE.Vector3(-0.08, 0.12, 0.12),
+          new THREE.Vector3(-0.34, 0.42, 0.15),
+          new THREE.Vector3(-0.68, 0.55, 0.08),
+          new THREE.Vector3(-0.96, 0.44, -0.02)
+        ]),
+        new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0.05, -0.08, -0.16),
+          new THREE.Vector3(0.34, -0.35, -0.2),
+          new THREE.Vector3(0.64, -0.48, -0.14),
+          new THREE.Vector3(0.94, -0.42, 0.02)
+        ]),
+        new THREE.CatmullRomCurve3([
+          new THREE.Vector3(-0.12, 0.08, -0.16),
+          new THREE.Vector3(-0.42, -0.2, -0.28),
+          new THREE.Vector3(-0.68, -0.4, -0.25),
+          new THREE.Vector3(-0.9, -0.46, -0.08)
+        ])
+      ];
+      for (const path of microtubulePaths) {
+        cytoskeleton.add(new THREE.Mesh(
+          new THREE.TubeGeometry(path, 64, 0.012, 8, false),
+          microtubuleMaterial
+        ));
+      }
+      const actinPaths = [
+        [[-1.05, 0.48, 0.12], [-0.75, 0.64, 0.26], [-0.32, 0.68, 0.35], [0.2, 0.63, 0.35]],
+        [[-1.08, -0.42, 0.18], [-0.7, -0.63, 0.3], [-0.25, -0.66, 0.34], [0.25, -0.61, 0.3]],
+        [[0.38, 0.55, 0.22], [0.76, 0.42, 0.25], [1.04, 0.18, 0.18]]
+      ];
+      for (const points of actinPaths) {
+        const path = new THREE.CatmullRomCurve3(
+          points.map(([x, y, z]) => new THREE.Vector3(x, y, z))
+        );
+        cytoskeleton.add(new THREE.Mesh(
+          new THREE.TubeGeometry(path, 40, 0.009, 7, false),
+          actinMaterial
+        ));
+      }
+      const intermediatePaths = [
+        [[-0.42, 0.02, -0.25], [-0.48, 0.28, -0.2], [-0.27, 0.42, -0.14], [-0.08, 0.25, -0.1]],
+        [[-0.4, -0.1, -0.23], [-0.45, -0.32, -0.16], [-0.18, -0.42, -0.12], [0.02, -0.24, -0.1]]
+      ];
+      for (const points of intermediatePaths) {
+        const path = new THREE.CatmullRomCurve3(
+          points.map(([x, y, z]) => new THREE.Vector3(x, y, z))
+        );
+        cytoskeleton.add(new THREE.Mesh(
+          new THREE.TubeGeometry(path, 36, 0.01, 7, false),
+          intermediateMaterial
+        ));
+      }
+      markPickable(cytoskeleton, "cytoskeleton");
+      focusAnchors.cytoskeleton = cytoskeleton;
+
+      const transportVesicles = new THREE.Group();
+      cell.add(transportVesicles);
+      const vesicleMembraneMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0xc5a0ec,
+        transparent: true,
+        opacity: 0.48,
+        roughness: 0.35,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const vesicleCargoMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffc867,
+        emissive: 0x68400c,
+        roughness: 0.42
+      });
+      const vesicleCoatMaterial = new THREE.MeshStandardMaterial({
+        color: 0x8061a5,
+        roughness: 0.5
+      });
+      function createTransportVesicle(position = new THREE.Vector3(), radius = 0.052, coated = false) {
+        const vesicle = new THREE.Group();
+        vesicle.position.copy(position);
+        const membrane = new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, radius, 20, 16),
+          vesicleMembraneMaterial
+        );
+        vesicle.add(membrane);
+        const cargo = new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, radius * 0.42, 14, 10),
+          vesicleCargoMaterial
+        );
+        cargo.position.set(0, 0, radius * 0.35);
+        vesicle.add(cargo);
+        if (coated) {
+          for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 2;
+            const coatProtein = new THREE.Mesh(
+              getSharedGeometry(THREE.SphereGeometry, radius * 0.15, 8, 6),
+              vesicleCoatMaterial
+            );
+            coatProtein.position.set(
+              Math.cos(angle) * radius * 0.72,
+              Math.sin(angle) * radius * 0.72,
+              radius * 0.45
+            );
+            vesicle.add(coatProtein);
+          }
+        }
+        return vesicle;
+      }
+      const staticVesiclePositions = [
+        [-0.45, 0.18, 0.26], [-0.29, 0.25, 0.22],
+        [0.3, -0.04, 0.53], [0.76, -0.18, 0.47],
+        [0.84, 0.2, 0.12], [-0.78, -0.15, 0.3]
+      ];
+      const vesicleInstances = [];
+      for (const [index, [x, y, z]] of staticVesiclePositions.entries()) {
+        const vesicle = createTransportVesicle(
+          new THREE.Vector3(x, y, z),
+          0.042,
+          index === 0 || index === 3
+        );
+        transportVesicles.add(vesicle);
+        vesicleInstances.push(vesicle);
+      }
+      markPickable(transportVesicles, "vesicles");
+      for (const vesicle of vesicleInstances) {
+        vesicle.traverse((object) => {
+          if (object.isMesh) object.userData.organelleAnchor = vesicle;
+        });
+      }
+      const transportSystem = new THREE.Group();
+      cell.add(transportSystem);
+      const motorHeadMaterial = new THREE.MeshStandardMaterial({
+        color: 0xf2bd4b,
+        emissive: 0x5c3908,
+        roughness: 0.38
+      });
+      const motorStalkMaterial = new THREE.MeshStandardMaterial({
+        color: 0x416e9b,
+        roughness: 0.45
+      });
+      const movingCarriers = [];
+      let firstMotorProtein;
+      for (let i = 0; i < 2; i++) {
+        const carrier = new THREE.Group();
+        const motor = new THREE.Group();
+        const heads = [];
+        for (const side of [-1, 1]) {
+          const head = new THREE.Mesh(
+            getSharedGeometry(THREE.SphereGeometry, 0.018, 12, 10),
+            motorHeadMaterial
+          );
+          head.position.set(0, side * 0.016, 0);
+          motor.add(head);
+          heads.push({ mesh: head, side });
+        }
+        const stalk = new THREE.Mesh(
+          getSharedGeometry(THREE.CylinderGeometry, 0.006, 0.009, 0.055, 8),
+          motorStalkMaterial
+        );
+        stalk.position.y = 0.04;
+        motor.add(stalk);
+        carrier.add(motor);
+        const cargoVesicle = createTransportVesicle(
+          new THREE.Vector3(0, 0.095, 0),
+          0.038,
+          true
+        );
+        carrier.add(cargoVesicle);
+        transportSystem.add(carrier);
+        markPickable(motor, "motorProteins");
+        markPickable(cargoVesicle, "vesicles");
+        movingCarriers.push({
+          carrier,
+          motor,
+          cargoVesicle,
+          heads,
+          route: transportRoutes[i],
+          offset: i * 0.45
+        });
+        firstMotorProtein = firstMotorProtein || motor;
+      }
+      focusAnchors.motorProteins = firstMotorProtein;
+      focusAnchors.vesicles = movingCarriers[0].cargoVesicle;
+
+      const secretoryRoute = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0.64, -0.1, 0.41),
+        new THREE.Vector3(0.77, -0.05, 0.45),
+        new THREE.Vector3(0.9, 0.0, 0.49),
+        new THREE.Vector3(1.02, 0.06, 0.53),
+        new THREE.Vector3(1.2, 0.13, 0.58),
+        new THREE.Vector3(1.42, 0.2, 0.64)
+      ]);
+      const secretoryTrackMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffd18a,
+        transparent: true,
+        opacity: 0.42,
+        depthWrite: false
+      });
+      cell.add(new THREE.Mesh(
+        new THREE.TubeGeometry(secretoryRoute, 64, 0.0035, 6, false),
+        secretoryTrackMaterial
+      ));
+
+      const secretoryVesicleMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0xe7a9e8,
+        transparent: true,
+        opacity: 0.72,
+        roughness: 0.34,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const secretoryCoatMaterial = new THREE.MeshStandardMaterial({
+        color: 0x8c65ad,
+        emissive: 0x251438,
+        roughness: 0.42
+      });
+      const secretoryCargoMaterial = new THREE.MeshStandardMaterial({
+        color: 0xffd36b,
+        emissive: 0x80551b,
+        roughness: 0.38
+      });
+      const secretoryVesicles = [];
+      const secretoryPhaseOffsets = [0.02, 0.22, 0.42, 0.62, 0.82];
+      for (let index = 0; index < secretoryPhaseOffsets.length; index++) {
+        const vesicle = new THREE.Group();
+        const shell = new THREE.Group();
+        shell.add(new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, 0.038, 18, 14),
+          secretoryVesicleMaterial
+        ));
+        const membraneRim = new THREE.Mesh(
+          getSharedGeometry(THREE.TorusGeometry, 0.034, 0.0025, 6, 24),
+          secretoryCoatMaterial
+        );
+        membraneRim.rotation.x = Math.PI / 2;
+        shell.add(membraneRim);
+        for (let coat = 0; coat < 8; coat++) {
+          const angle = coat * Math.PI / 4;
+          const coatProtein = new THREE.Mesh(
+            getSharedGeometry(THREE.SphereGeometry, 0.005, 8, 6),
+            secretoryCoatMaterial
+          );
+          coatProtein.position.set(
+            Math.cos(angle) * 0.034,
+            Math.sin(angle) * 0.034,
+            0.012
+          );
+          shell.add(coatProtein);
+        }
+        vesicle.add(shell);
+
+        const cargoParticles = Array.from({ length: 3 }, (_, cargoIndex) => {
+          const cargo = new THREE.Mesh(
+            getSharedGeometry(THREE.SphereGeometry, 0.009, 10, 8),
+            secretoryCargoMaterial
+          );
+          cargo.position.set(
+            (cargoIndex - 1) * 0.012,
+            cargoIndex === 1 ? 0.012 : -0.008,
+            0.008
+          );
+          vesicle.add(cargo);
+          return cargo;
+        });
+        cell.add(vesicle);
+        secretoryVesicles.push({
+          group: vesicle,
+          shell,
+          cargoParticles,
+          phaseOffset: secretoryPhaseOffsets[index]
+        });
+      }
+
+      let membraneCrossingProgress = 0;
+      for (let sample = 0; sample <= 100; sample++) {
+        const point = secretoryRoute.getPointAt(sample / 100);
+        const normalizedDistance =
+          (point.x / 1.25) ** 2 + (point.y / 0.85) ** 2 + (point.z / 0.9) ** 2;
+        if (normalizedDistance >= 1) {
+          membraneCrossingProgress = sample / 100;
+          break;
+        }
+      }
+      const cargoReleaseProgress = Math.min(membraneCrossingProgress + 0.27, 0.98);
+
+      const peroxisomes = new THREE.Group();
+      cell.add(peroxisomes);
+      const peroxisomeMembraneMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0x63b78c,
+        transparent: true,
+        opacity: 0.46,
+        roughness: 0.4,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const peroxisomeMatrixMaterial = new THREE.MeshStandardMaterial({
+        color: 0xa5df9e,
+        roughness: 0.48
+      });
+      const peroxisomePositions = [
+        [-0.7, 0.16, -0.12], [0.72, 0.28, -0.1],
+        [0.55, -0.48, -0.14], [-0.78, -0.3, -0.12]
+      ];
+      let firstPeroxisome;
+      for (const [x, y, z] of peroxisomePositions) {
+        const peroxisome = new THREE.Group();
+        peroxisome.position.set(x, y, z);
+        const membrane = new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, 0.075, 24, 18),
+          peroxisomeMembraneMaterial
+        );
+        peroxisome.add(membrane);
+        const matrix = new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, 0.052, 20, 16),
+          peroxisomeMatrixMaterial
+        );
+        peroxisome.add(matrix);
+        const enzymeCore = new THREE.Mesh(
+          getSharedGeometry(THREE.OctahedronGeometry, 0.026, 1),
+          new THREE.MeshStandardMaterial({ color: 0x387f5b, roughness: 0.38 })
+        );
+        enzymeCore.position.set(0.012, 0.008, 0.025);
+        peroxisome.add(enzymeCore);
+        peroxisomes.add(peroxisome);
+        markPickable(peroxisome, "peroxisomes");
+        firstPeroxisome = firstPeroxisome || peroxisome;
+      }
+      focusAnchors.peroxisomes = firstPeroxisome;
+
+      const tissueContext = new THREE.Group();
+      tissueContext.visible = false;
+      scene.add(tissueContext);
+      const tissueCellGeometry = getSharedGeometry(THREE.SphereGeometry, 1, 32, 24);
+      const tissueCells = [
+        { position: [-2.55, 0, -0.75], color: 0x7ca9d4, scale: [1.08, 0.76, 0.62] },
+        { position: [2.55, 0, -0.75], color: 0x83b9aa, scale: [1.08, 0.76, 0.62] },
+        { position: [0, 1.92, -1.05], color: 0xc49bc8, scale: [0.94, 0.7, 0.58] },
+        { position: [0, -1.92, -1.05], color: 0xe0b27e, scale: [0.94, 0.7, 0.58] }
+      ];
+      for (const [index, neighbor] of tissueCells.entries()) {
+        const neighborGroup = new THREE.Group();
+        neighborGroup.position.set(...neighbor.position);
+        const membraneMaterial = new THREE.MeshPhysicalMaterial({
+          color: neighbor.color,
+          transparent: true,
+          opacity: 0.38,
+          roughness: 0.4,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        });
+        const cytoplasmMaterial = new THREE.MeshStandardMaterial({
+          color: neighbor.color,
+          transparent: true,
+          opacity: 0.13,
+          roughness: 0.62,
+          depthWrite: false
+        });
+        const shell = new THREE.Mesh(tissueCellGeometry, membraneMaterial);
+        shell.scale.set(...neighbor.scale);
+        neighborGroup.add(shell);
+        const interior = new THREE.Mesh(tissueCellGeometry, cytoplasmMaterial);
+        interior.scale.set(
+          neighbor.scale[0] * 0.91,
+          neighbor.scale[1] * 0.91,
+          neighbor.scale[2] * 0.91
+        );
+        neighborGroup.add(interior);
+        const nucleus = new THREE.Mesh(
+          getSharedGeometry(THREE.SphereGeometry, 0.2, 20, 16),
+          new THREE.MeshStandardMaterial({
+            color: 0x596f9f,
+            transparent: true,
+            opacity: 0.55,
+            roughness: 0.5
+          })
+        );
+        nucleus.position.set(index < 2 ? 0.05 : -0.08, 0, 0.06);
+        nucleus.scale.set(1, 0.82, 0.72);
+        neighborGroup.add(nucleus);
+        tissueContext.add(neighborGroup);
+      }
+
+      const matrixMaterial = new THREE.MeshStandardMaterial({
+        color: 0xb28b69,
+        roughness: 0.72,
+        transparent: true,
+        opacity: 0.75
+      });
+      const matrixFibers = [
+        [[-1.28, 0.35, 0.12], [-1.4, 0.46, -0.05], [-1.52, 0.39, -0.35]],
+        [[1.28, 0.35, 0.12], [1.4, 0.46, -0.05], [1.52, 0.39, -0.35]],
+        [[-0.35, 0.88, 0.08], [-0.28, 1.0, -0.2], [-0.24, 1.18, -0.48]],
+        [[0.35, -0.88, 0.08], [0.28, -1.0, -0.2], [0.24, -1.18, -0.48]]
+      ];
+      for (const points of matrixFibers) {
+        const fiberPath = new THREE.CatmullRomCurve3(
+          points.map(([x, y, z]) => new THREE.Vector3(x, y, z))
+        );
+        tissueContext.add(new THREE.Mesh(
+          new THREE.TubeGeometry(fiberPath, 20, 0.012, 6, false),
+          matrixMaterial
+        ));
+      }
+
+      const gapJunctionMaterial = new THREE.MeshStandardMaterial({
+        color: 0x49c7bb,
+        emissive: 0x125b55,
+        emissiveIntensity: 0.75,
+        roughness: 0.35
+      });
+      const gapJunctionChannels = [];
+      for (const y of [-0.16, 0, 0.16]) {
+        const channel = new THREE.Mesh(
+          getSharedGeometry(THREE.CylinderGeometry, 0.034, 0.034, 0.3, 12),
+          gapJunctionMaterial
+        );
+        channel.position.set(1.39, y, 0.02);
+        channel.rotation.z = Math.PI / 2;
+        tissueContext.add(channel);
+        gapJunctionChannels.push(channel);
+      }
+
+      const tissueReceptor = new THREE.Group();
+      tissueReceptor.position.set(1.53, 0.2, -0.48);
+      const tissueReceptorMaterial = new THREE.MeshStandardMaterial({
+        color: 0xf3b84d,
+        emissive: 0x87520e,
+        emissiveIntensity: 0.65,
+        roughness: 0.4
+      });
+      const receptorStem = new THREE.Mesh(
+        getSharedGeometry(THREE.CylinderGeometry, 0.016, 0.016, 0.09, 10),
+        tissueReceptorMaterial
+      );
+      receptorStem.rotation.z = Math.PI / 2;
+      tissueReceptor.add(receptorStem);
+      const receptorHead = new THREE.Mesh(
+        getSharedGeometry(THREE.SphereGeometry, 0.04, 12, 10),
+        tissueReceptorMaterial
+      );
+      receptorHead.position.x = 0.05;
+      tissueReceptor.add(receptorHead);
+      tissueContext.add(tissueReceptor);
+
+      const animationRoot = new THREE.Group();
+      animationRoot.visible = false;
+      scene.add(animationRoot);
+      const animationGeometry = new THREE.SphereGeometry(1, 18, 14);
+      const animationMaterials = {
+        cargo: new THREE.MeshStandardMaterial({ color: 0xffc15c, emissive: 0x82400d, emissiveIntensity: 1.1 }),
+        energy: new THREE.MeshStandardMaterial({ color: 0x81e7fa, emissive: 0x1b91ba, emissiveIntensity: 1.2 }),
+        electron: new THREE.MeshStandardMaterial({ color: 0x8db8ff, emissive: 0x315eae, emissiveIntensity: 1.2 }),
+        protein: new THREE.MeshStandardMaterial({ color: 0xf6d45f, emissive: 0x8c5a0b, emissiveIntensity: 0.9 }),
+        membraneOuter: new THREE.MeshStandardMaterial({ color: 0xe9a9bb, emissive: 0x54283a, emissiveIntensity: 0.6 }),
+        membraneInner: new THREE.MeshStandardMaterial({ color: 0x9f87cf, emissive: 0x3c2b64, emissiveIntensity: 0.6 }),
+        channel: new THREE.MeshStandardMaterial({ color: 0x73a6c7, emissive: 0x1b425f, emissiveIntensity: 0.7 }),
+        debris: new THREE.MeshStandardMaterial({ color: 0x866042, emissive: 0x3c2412, emissiveIntensity: 0.4 }),
+        recycled: new THREE.MeshStandardMaterial({ color: 0x8be0a4, emissive: 0x267c43, emissiveIntensity: 0.9 }),
+        lipid: new THREE.MeshStandardMaterial({ color: 0xf0b875, emissive: 0x67401a, emissiveIntensity: 0.7 }),
+        steroid: new THREE.MeshStandardMaterial({ color: 0xe9a5d6, emissive: 0x5d2852, emissiveIntensity: 0.7 }),
+        calcium: new THREE.MeshStandardMaterial({ color: 0x68d9f0, emissive: 0x17748c, emissiveIntensity: 1 }),
+        detox: new THREE.MeshStandardMaterial({ color: 0xb9e777, emissive: 0x426c18, emissiveIntensity: 0.8 })
+      };
+      const focusHalo = new THREE.Mesh(
+        new THREE.TorusGeometry(0.32, 0.009, 8, 64),
+        new THREE.MeshBasicMaterial({
+          color: 0xffd36b,
+          transparent: true,
+          opacity: 0.78,
+          depthWrite: false
+        })
+      );
+      focusHalo.visible = false;
+      scene.add(focusHalo);
+      const haloSizes = {
+        membrane: 1.2,
+        cytoplasm: 0.72,
+        nucleus: 1.1,
+        mitochondria: 0.55,
+        er: 1.45,
+        golgi: 0.8,
+        ribosomes: 0.48,
+        lysosomes: 0.58,
+        cytoskeleton: 1.15,
+        vesicles: 0.62,
+        peroxisomes: 0.58,
+        motorProteins: 0.48
+      };
+      let animationUpdater = () => {};
+
+      function addAnimationParticle(material, size, offset = new THREE.Vector3()) {
+        const particle = new THREE.Mesh(animationGeometry, material);
+        particle.scale.setScalar(size);
+        particle.position.copy(offset);
+        animationRoot.add(particle);
+        return particle;
+      }
+
+      function addAnimationLabel(text, x, y, width = 0.17) {
+        const canvas = document.createElement("canvas");
+        canvas.width = 512;
+        canvas.height = 144;
+        const context = canvas.getContext("2d");
+        context.font = "bold 42px system-ui, sans-serif";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.lineJoin = "round";
+        context.fillStyle = "rgba(239, 247, 255, 0.92)";
+        context.fillRect(6, 8, canvas.width - 12, canvas.height - 16);
+        context.lineWidth = 4;
+        context.strokeStyle = "rgba(48, 73, 110, 0.55)";
+        context.strokeRect(6, 8, canvas.width - 12, canvas.height - 16);
+        context.fillStyle = "#26344f";
+        const lines = text.split("\n");
+        lines.forEach((line, index) => {
+          const lineY = canvas.height / 2 + (index - (lines.length - 1) / 2) * 46;
+          context.strokeText(line, canvas.width / 2, lineY);
+          context.fillText(line, canvas.width / 2, lineY);
+        });
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        const label = new THREE.Sprite(new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+          depthTest: false,
+          depthWrite: false
+        }));
+        label.position.set(x, y, 0.16);
+        label.scale.set(width, width * canvas.height / canvas.width, 1);
+        label.renderOrder = 100;
+        label.frustumCulled = false;
+        animationRoot.add(label);
+        return label;
+      }
+
+      function configureLysosomeRoute(id) {
+        const singleMembraneMaterial = new THREE.MeshPhysicalMaterial({
+          color: 0xb69ad8,
+          transparent: true,
+          opacity: 0.62,
+          roughness: 0.32,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        });
+        const innerMembraneMaterial = new THREE.MeshPhysicalMaterial({
+          color: 0xf0b1c6,
+          transparent: true,
+          opacity: 0.6,
+          roughness: 0.32,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        });
+        const lysosomeMaterial = new THREE.MeshPhysicalMaterial({
+          color: 0xe9c55d,
+          transparent: true,
+          opacity: 0.66,
+          roughness: 0.38,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        });
+        const cargoMaterial = new THREE.MeshStandardMaterial({
+          color: 0x69a9bf,
+          emissive: 0x183e4c,
+          roughness: 0.42
+        });
+        const labelY = -0.09;
+        const nodeZ = 0.075;
+        const addNodeShell = (x, y, radius, material) => {
+          const shell = new THREE.Mesh(
+            new THREE.SphereGeometry(1, 20, 16),
+            material
+          );
+          shell.position.set(x, y, nodeZ);
+          shell.scale.set(radius, radius, radius * 0.7);
+          animationRoot.add(shell);
+          return shell;
+        };
+        const addLysosomeNode = (x) => {
+          addNodeShell(x, 0, 0.038, lysosomeMaterial);
+          const lumen = new THREE.Mesh(
+            new THREE.SphereGeometry(0.019, 12, 10),
+            animationMaterials.debris
+          );
+          lumen.position.set(x, 0, nodeZ + 0.005);
+          animationRoot.add(lumen);
+        };
+        const addArrowRoute = (points) => {
+          const route = new THREE.CatmullRomCurve3(
+            points.map(([x, y]) => new THREE.Vector3(x, y, 0.075))
+          );
+          animationRoot.add(new THREE.Mesh(
+            new THREE.TubeGeometry(route, 36, 0.0025, 6, false),
+            new THREE.MeshBasicMaterial({
+              color: 0x6485a8,
+              transparent: true,
+              opacity: 0.58,
+              depthTest: false
+            })
+          ));
+          for (let index = 0; index < points.length - 1; index++) {
+            const start = new THREE.Vector3(points[index][0], points[index][1], 0.075);
+            const end = new THREE.Vector3(points[index + 1][0], points[index + 1][1], 0.075);
+            const direction = end.clone().sub(start).normalize();
+            const arrow = new THREE.Mesh(
+              new THREE.ConeGeometry(0.007, 0.018, 8),
+              new THREE.MeshBasicMaterial({ color: 0x6485a8, depthTest: false })
+            );
+            arrow.position.copy(start.lerp(end, 0.78));
+            arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+            animationRoot.add(arrow);
+          }
+          return route;
+        };
+        const addSingleMembraneVesicle = (x, y, radius, cargoColor = cargoMaterial) => {
+          const group = new THREE.Group();
+          group.position.set(x, y, nodeZ);
+          const shell = new THREE.Mesh(
+            new THREE.SphereGeometry(1, 20, 16),
+            singleMembraneMaterial
+          );
+          shell.scale.set(radius, radius, radius * 0.7);
+          group.add(shell);
+          const cargo = new THREE.Mesh(
+            new THREE.SphereGeometry(radius * 0.34, 10, 8),
+            cargoColor
+          );
+          cargo.position.z = radius * 0.25;
+          group.add(cargo);
+          animationRoot.add(group);
+          return group;
+        };
+        const addDamagedOrganelle = (parent, scale = 1) => {
+          const outer = new THREE.Mesh(
+            new THREE.SphereGeometry(1, 16, 12),
+            new THREE.MeshStandardMaterial({ color: 0xd87b52, roughness: 0.48 })
+          );
+          outer.scale.set(0.043 * scale, 0.027 * scale, 0.022 * scale);
+          parent.add(outer);
+          const inner = new THREE.Mesh(
+            new THREE.SphereGeometry(1, 16, 12),
+            new THREE.MeshStandardMaterial({ color: 0xf1c578, roughness: 0.44 })
+          );
+          inner.scale.set(0.033 * scale, 0.017 * scale, 0.014 * scale);
+          parent.add(inner);
+          for (let fold = 0; fold < 3; fold++) {
+            const crista = new THREE.Mesh(
+              new THREE.SphereGeometry(0.0035 * scale, 8, 6),
+              animationMaterials.debris
+            );
+            crista.position.set((fold - 1) * 0.014 * scale, 0, 0.016 * scale);
+            parent.add(crista);
+          }
+        };
+
+        if (id === "phagocytosis") {
+          const route = addArrowRoute([[-0.17, 0], [0, 0], [0.17, 0]]);
+          addAnimationLabel("Bakterium", -0.17, labelY);
+          addAnimationLabel("Phagosom\nEinzelmembran", 0, labelY, 0.2);
+          addAnimationLabel("Phagolysosom", 0.17, labelY);
+          addLysosomeNode(0.17);
+
+          const phagosome = new THREE.Group();
+          phagosome.add(new THREE.Mesh(
+            new THREE.SphereGeometry(1, 20, 16),
+            singleMembraneMaterial
+          ));
+          const bacterium = new THREE.Group();
+          const body = new THREE.Mesh(
+            new THREE.SphereGeometry(1, 16, 12),
+            new THREE.MeshStandardMaterial({
+              color: 0x4ca779,
+              emissive: 0x173d28,
+              roughness: 0.4
+            })
+          );
+          body.scale.set(0.03, 0.017, 0.014);
+          bacterium.add(body);
+          for (let pili = 0; pili < 6; pili++) {
+            const angle = pili * Math.PI / 3;
+            const pilus = new THREE.Mesh(
+              new THREE.SphereGeometry(0.0045, 8, 6),
+              animationMaterials.recycled
+            );
+            pilus.position.set(Math.cos(angle) * 0.032, Math.sin(angle) * 0.021, 0);
+            bacterium.add(pilus);
+          }
+          phagosome.add(bacterium);
+          animationRoot.add(phagosome);
+          const products = Array.from({ length: 4 }, () =>
+            addAnimationParticle(animationMaterials.recycled, 0.009)
+          );
+          animationUpdater = (time) => {
+            const progress = reduceMotion ? 0.45 : (time * 0.14) % 1;
+            const engulfed = THREE.MathUtils.clamp(progress / 0.24, 0, 1);
+            const travel = THREE.MathUtils.clamp((progress - 0.24) / 0.48, 0, 1);
+            const fused = THREE.MathUtils.clamp((progress - 0.72) / 0.14, 0, 1);
+            const routePosition = route.getPointAt(travel);
+            phagosome.position.copy(routePosition);
+            phagosome.position.z = nodeZ;
+            phagosome.scale.setScalar(engulfed * (1 - fused * 0.4));
+            phagosome.children[0].scale.set(0.046, 0.038, 0.029);
+            phagosome.children[0].visible = progress > 0.08 && progress < 0.88;
+            products.forEach((product, index) => {
+              const angle = index * Math.PI / 2;
+              product.position.set(
+                0.17 + Math.cos(angle) * (0.008 + fused * 0.027),
+                Math.sin(angle) * (0.008 + fused * 0.027),
+                nodeZ + 0.015
+              );
+              product.scale.setScalar(fused * 0.009);
+            });
+          };
+          return;
+        }
+
+        if (id === "endosomalPathway") {
+          const positions = [-0.22, -0.075, 0.075, 0.22];
+          const labels = [
+            "Endocytose-\nVesikel",
+            "Frühes\nEndosom",
+            "Spätes\nEndosom",
+            "Lysosom"
+          ];
+          const routePoints = positions.map((x) => [x, 0]);
+          const route = addArrowRoute(routePoints);
+          positions.forEach((x, index) => {
+            addAnimationLabel(labels[index], x, labelY, 0.15);
+            if (index === positions.length - 1) {
+              addLysosomeNode(x);
+            } else {
+              addSingleMembraneVesicle(
+                x,
+                0,
+                index === 0 ? 0.028 : 0.034,
+                index === 1 ? animationMaterials.energy : cargoMaterial
+              );
+            }
+          });
+          addAnimationLabel("jeweils Einzelmembran", 0, -0.18, 0.23);
+          const cargo = addAnimationParticle(animationMaterials.protein, 0.013);
+          animationUpdater = (time) => {
+            const progress = (time * 0.12) % 1;
+            cargo.position.copy(route.getPointAt(progress));
+            cargo.position.z = nodeZ + 0.018;
+          };
+          return;
+        }
+
+        addArrowRoute([[-0.17, 0], [0, 0], [0.17, 0]]);
+        const travelRoute = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, 0, nodeZ),
+          new THREE.Vector3(0.17, 0, nodeZ)
+        ]);
+        addAnimationLabel("Beschädigte\nOrganelle", -0.17, labelY, 0.19);
+        addAnimationLabel("Autophagosom\nDoppelmembran", 0, labelY, 0.2);
+        addAnimationLabel("Autolysosom", 0.17, labelY);
+
+        const damagedOrganelle = new THREE.Group();
+        damagedOrganelle.position.set(-0.17, 0, nodeZ);
+        addDamagedOrganelle(damagedOrganelle);
+        animationRoot.add(damagedOrganelle);
+
+        const autophagosome = new THREE.Group();
+        const outerMembrane = new THREE.Mesh(
+          new THREE.SphereGeometry(1, 20, 16),
+          singleMembraneMaterial
+        );
+        outerMembrane.scale.set(0.052, 0.045, 0.034);
+        autophagosome.add(outerMembrane);
+        const innerMembrane = new THREE.Mesh(
+          new THREE.SphereGeometry(1, 20, 16),
+          innerMembraneMaterial
+        );
+        innerMembrane.scale.set(0.041, 0.034, 0.024);
+        autophagosome.add(innerMembrane);
+        addDamagedOrganelle(autophagosome, 0.68);
+        animationRoot.add(autophagosome);
+        addLysosomeNode(0.17);
+        const products = Array.from({ length: 4 }, () =>
+          addAnimationParticle(animationMaterials.recycled, 0.009)
+        );
+        animationUpdater = (time) => {
+          const progress = reduceMotion ? 0.45 : (time * 0.12) % 1;
+          const formation = THREE.MathUtils.clamp(progress / 0.25, 0, 1);
+          const travel = THREE.MathUtils.clamp((progress - 0.25) / 0.45, 0, 1);
+          const fusion = THREE.MathUtils.clamp((progress - 0.7) / 0.14, 0, 1);
+          const position = travelRoute.getPointAt(travel);
+          autophagosome.position.set(
+            progress < 0.25 ? 0 : position.x,
+            0,
+            nodeZ
+          );
+          autophagosome.scale.setScalar(formation * (1 - fusion * 0.45));
+          products.forEach((product, index) => {
+            const angle = index * Math.PI / 2;
+            product.position.set(
+              0.17 + Math.cos(angle) * (0.008 + fusion * 0.027),
+              Math.sin(angle) * (0.008 + fusion * 0.027),
+              nodeZ + 0.015
+            );
+            product.scale.setScalar(fusion * 0.009);
+          });
+        };
+      }
+
+      const sharedAnimationMaterials = new Set(Object.values(animationMaterials));
+      function clearFunctionalAnimation() {
+        animationRoot.traverse((object) => {
+          if (!object.isMesh && !object.isSprite) return;
+          if (object.geometry && object.geometry !== animationGeometry) object.geometry.dispose();
+          if (object.material) {
+            const materials = Array.isArray(object.material) ? object.material : [object.material];
+            for (const material of materials) {
+              if (!sharedAnimationMaterials.has(material)) {
+                if (material.map) material.map.dispose();
+                material.dispose();
+              }
+            }
+          }
+        });
+        animationRoot.clear();
+      }
+
+      function configureFunctionalAnimation(id, origin, anchor, focusId = id) {
+        clearFunctionalAnimation();
+        animationRoot.visible = true;
+        animationRoot.position.copy(origin);
+        animationRoot.quaternion.identity();
+        if (focusId === "mitochondria" && anchor) {
+          anchor.getWorldQuaternion(animationRoot.quaternion);
+        }
+
+        if (id === "phagocytosis" || id === "endosomalPathway" || id === "autophagy") {
+          configureLysosomeRoute(id);
+        } else if (id === "paracrineSignal") {
+          const route = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(1.12, 0.1, 0.08),
+            new THREE.Vector3(1.28, 0.29, 0.03),
+            new THREE.Vector3(1.42, 0.31, -0.18),
+            new THREE.Vector3(1.53, 0.2, -0.48)
+          ]);
+          animationRoot.add(new THREE.Mesh(
+            new THREE.TubeGeometry(route, 36, 0.003, 6, false),
+            new THREE.MeshBasicMaterial({
+              color: 0xf3b84d,
+              transparent: true,
+              opacity: 0.42,
+              depthWrite: false
+            })
+          ));
+          addAnimationLabel("Signalmolekül", 1.32, 0.53, 0.34);
+          addAnimationLabel("Rezeptor", 1.69, -0.02, 0.25);
+          const signals = Array.from({ length: 5 }, () =>
+            addAnimationParticle(animationMaterials.protein, 0.019)
+          );
+          animationUpdater = (time) => {
+            signals.forEach((particle, index) => {
+              const phase = (time * 0.13 + index / signals.length) % 1;
+              particle.position.copy(route.getPointAt(phase));
+              particle.position.y += Math.sin(time * 2.2 + index) * 0.012;
+              particle.position.z += Math.cos(time * 1.7 + index) * 0.01;
+            });
+            tissueReceptor.scale.setScalar(1 + Math.max(0, Math.sin(time * 2)) * 0.16);
+            tissueReceptorMaterial.emissiveIntensity =
+              0.65 + Math.max(0, Math.sin(time * 2)) * 1.1;
+          };
+        } else if (id === "gapJunctionTransport") {
+          addAnimationLabel("Gap Junction\n(Connexine)", 1.38, 0.55, 0.38);
+          addAnimationLabel("Ionen / kleine\nMetabolite", 1.38, -0.48, 0.36);
+          const exchangedMolecules = Array.from({ length: 6 }, (_, index) =>
+            addAnimationParticle(
+              index % 2 === 0 ? animationMaterials.calcium : animationMaterials.recycled,
+              0.015
+            )
+          );
+          animationUpdater = (time) => {
+            exchangedMolecules.forEach((particle, index) => {
+              const phase = (time * 0.16 + index / exchangedMolecules.length) % 1;
+              const progress = index % 2 === 0 ? phase : 1 - phase;
+              particle.position.set(
+                0.92 + progress * 0.88,
+                (index % 3 - 1) * 0.07,
+                0.04 + Math.sin(progress * Math.PI) * 0.035
+              );
+            });
+            gapJunctionChannels.forEach((channel, index) => {
+              channel.scale.y = 1 + Math.sin(time * 2 + index) * 0.08;
+            });
+          };
+        } else if (id === "membraneTransport") {
+          const channel = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.026, 0.026, 0.12, 12),
+            animationMaterials.channel
+          );
+          channel.position.x = -0.07;
+          channel.rotation.x = Math.PI / 2;
+          animationRoot.add(channel);
+          const pore = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.009, 0.009, 0.124, 10),
+            new THREE.MeshBasicMaterial({ color: 0xcaf4ff, depthTest: false })
+          );
+          pore.position.x = -0.07;
+          pore.rotation.x = Math.PI / 2;
+          pore.renderOrder = 5;
+          animationRoot.add(pore);
+          for (const z of [-0.045, 0.045]) {
+            const rim = new THREE.Mesh(
+              new THREE.TorusGeometry(0.025, 0.004, 8, 24),
+              animationMaterials.channel
+            );
+            rim.rotation.x = Math.PI / 2;
+            rim.position.set(-0.07, 0, z);
+            animationRoot.add(rim);
+          }
+          const carrier = new THREE.Group();
+          carrier.position.x = 0.07;
+          const carrierLobes = [-1, 1].map((side) => {
+            const lobe = new THREE.Mesh(
+              new THREE.SphereGeometry(1, 14, 10),
+              animationMaterials.channel
+            );
+            lobe.scale.set(0.024, 0.031, 0.023);
+            lobe.position.z = side * 0.027;
+            carrier.add(lobe);
+            return lobe;
+          });
+          const bindingSite = new THREE.Mesh(
+            new THREE.SphereGeometry(0.012, 12, 10),
+            animationMaterials.protein
+          );
+          carrier.add(bindingSite);
+          animationRoot.add(carrier);
+          const cargoParticles = Array.from({ length: 5 }, (_, index) =>
+            addAnimationParticle(animationMaterials.cargo, 0.014 + (index % 2) * 0.003)
+          );
+          const carrierCargo = addAnimationParticle(animationMaterials.protein, 0.014);
+          animationUpdater = (time) => {
+            cargoParticles.forEach((particle, index) => {
+              const phase = (time * 0.3 + index / cargoParticles.length) % 1;
+              particle.position.set(
+                -0.07 + Math.sin(time * 2 + index) * 0.006,
+                0,
+                0.13 - phase * 0.26
+              );
+            });
+            const conformation = Math.sin(time * 1.8);
+            carrier.rotation.y = conformation * 0.22;
+            carrierLobes[0].position.z = -0.027 + conformation * 0.005;
+            carrierLobes[1].position.z = 0.027 - conformation * 0.005;
+            const cargoPhase = (time * 0.2) % 1;
+            carrierCargo.position.set(0.07, 0, 0.13 - cargoPhase * 0.26);
+            carrierCargo.scale.setScalar(0.012 + Math.max(0, 1 - Math.abs(cargoPhase - 0.5) * 4) * 0.006);
+          };
+        } else if (id === "endocytosis" || id === "exocytosis") {
+          const isEndocytosis = id === "endocytosis";
+          const vesicleMembrane = new THREE.Mesh(
+            new THREE.SphereGeometry(1, 24, 18),
+            new THREE.MeshPhysicalMaterial({
+              color: 0xb996d6,
+              transparent: true,
+              opacity: 0.56,
+              roughness: 0.35,
+              side: THREE.DoubleSide,
+              depthWrite: false
+            })
+          );
+          animationRoot.add(vesicleMembrane);
+          const cargo = addAnimationParticle(animationMaterials.cargo, 0.018);
+          const leafletParticles = [];
+          for (let leaflet = 0; leaflet < 2; leaflet++) {
+            for (let sample = 0; sample < 13; sample++) {
+              leafletParticles.push({
+                mesh: addAnimationParticle(
+                  leaflet === 0 ? animationMaterials.membraneOuter : animationMaterials.membraneInner,
+                  0.007
+                ),
+                leaflet,
+                sample
+              });
+            }
+          }
+          animationUpdater = (time) => {
+            const phase = (time * 0.15) % 1;
+            const bend = Math.sin(phase * Math.PI) * (isEndocytosis ? -0.09 : 0.055);
+            leafletParticles.forEach(({ mesh, leaflet, sample }) => {
+              const x = (sample - 6) * 0.019;
+              const centerWeight = 1 - Math.abs(x) / 0.114;
+              mesh.position.set(
+                x,
+                0,
+                (leaflet === 0 ? 0.009 : -0.009) + bend * centerWeight
+              );
+            });
+            if (isEndocytosis) {
+              const vesicleGrowth = THREE.MathUtils.clamp((phase - 0.43) / 0.34, 0, 1);
+              vesicleMembrane.position.set(0, 0, -0.075 - vesicleGrowth * 0.035);
+              vesicleMembrane.scale.setScalar(0.038 * vesicleGrowth);
+              cargo.position.set(0, 0, 0.14 - phase * 0.29);
+            } else {
+              const fusion = THREE.MathUtils.clamp((phase - 0.4) / 0.27, 0, 1);
+              vesicleMembrane.position.set(0, 0, -0.13 + Math.min(phase / 0.52, 1) * 0.13);
+              vesicleMembrane.scale.setScalar(0.038 * (1 - fusion));
+              cargo.position.set(0, 0, -0.14 + phase * 0.34);
+            }
+          };
+        } else if (id === "membrane") {
+          const particles = [0, 1, 2].map((index) =>
+            addAnimationParticle(animationMaterials.cargo, 0.035)
+          );
+          animationUpdater = (time) => {
+            particles.forEach((particle, index) => {
+              const phase = (time * 0.42 + index / particles.length) % 1;
+              particle.position.set(
+                (index - 1) * 0.075,
+                0,
+                0.25 - phase * 0.55
+              );
+              particle.scale.setScalar(0.025 + Math.sin(phase * Math.PI) * 0.012);
+            });
+          };
+        } else if (id === "nucleus" || id === "nuclearTranscription") {
+          const strand = Array.from({ length: 7 }, () =>
+            addAnimationParticle(animationMaterials.energy, 0.018)
+          );
+          animationUpdater = (time) => {
+            strand.forEach((particle, index) => {
+              const progress = (time * 0.26 - index * 0.07 + 1) % 1;
+              particle.position.set(
+                0.12 + progress * 0.5,
+                0.12 + Math.sin(progress * Math.PI * 3) * 0.035,
+                0.22 + Math.sin(progress * Math.PI) * 0.025
+              );
+            });
+          };
+        } else if (id === "cytoplasm") {
+          const diffusingParticles = Array.from({ length: 8 }, (_, index) =>
+            addAnimationParticle(
+              index % 2 === 0 ? animationMaterials.energy : animationMaterials.protein,
+              index % 2 === 0 ? 0.007 : 0.009
+            )
+          );
+          animationUpdater = (time) => {
+            diffusingParticles.forEach((particle, index) => {
+              const phase = time * 0.8 + index * 1.7;
+              particle.position.set(
+                Math.sin(phase) * 0.13,
+                Math.sin(phase * 0.73 + index) * 0.1,
+                Math.cos(phase * 0.87) * 0.12
+              );
+            });
+          };
+        } else if (id === "glycolysis") {
+          const intermediates = Array.from({ length: 8 }, (_, index) =>
+            addAnimationParticle(
+              index % 2 === 0 ? animationMaterials.cargo : animationMaterials.energy,
+              index % 2 === 0 ? 0.014 : 0.01
+            )
+          );
+          const pyruvate = Array.from({ length: 2 }, () =>
+            addAnimationParticle(animationMaterials.protein, 0.017)
+          );
+          const atp = Array.from({ length: 2 }, () =>
+            addAnimationParticle(animationMaterials.energy, 0.012)
+          );
+          animationUpdater = (time) => {
+            intermediates.forEach((particle, index) => {
+              const phase = (time * 0.22 + index / intermediates.length) % 1;
+              particle.position.set(
+                -0.16 + phase * 0.25,
+                Math.sin(phase * Math.PI * 2 + index) * 0.025,
+                0.025 + Math.sin(phase * Math.PI) * 0.018
+              );
+            });
+            pyruvate.forEach((particle, index) => {
+              const phase = (time * 0.16 + index * 0.5) % 1;
+              particle.position.set(
+                0.11 + phase * 0.11,
+                (index === 0 ? -1 : 1) * (0.025 + phase * 0.035),
+                0.02
+              );
+            });
+            atp.forEach((particle, index) => {
+              const phase = (time * 0.2 + index * 0.5) % 1;
+              particle.position.set(-0.02 + phase * 0.15, -0.055, 0.025);
+            });
+          };
+        } else if (id === "citricCycle") {
+          const cycleRing = new THREE.Mesh(
+            new THREE.TorusGeometry(0.052, 0.0025, 6, 48),
+            new THREE.MeshBasicMaterial({
+              color: 0x89d7a2,
+              transparent: true,
+              opacity: 0.82,
+              depthTest: false
+            })
+          );
+          cycleRing.position.z = 0.024;
+          cycleRing.renderOrder = 5;
+          animationRoot.add(cycleRing);
+          const metabolites = Array.from({ length: 8 }, (_, index) =>
+            addAnimationParticle(
+              index % 2 === 0 ? animationMaterials.cargo : animationMaterials.recycled,
+              0.012
+            )
+          );
+          const carbonDioxide = Array.from({ length: 2 }, () =>
+            addAnimationParticle(animationMaterials.debris, 0.009)
+          );
+          const reducingEquivalents = Array.from({ length: 3 }, () =>
+            addAnimationParticle(animationMaterials.electron, 0.01)
+          );
+          animationUpdater = (time) => {
+            metabolites.forEach((particle, index) => {
+              const angle = time * 0.32 + index * Math.PI * 2 / metabolites.length;
+              particle.position.set(
+                Math.cos(angle) * 0.052,
+                Math.sin(angle) * 0.052,
+                0.024
+              );
+            });
+            carbonDioxide.forEach((particle, index) => {
+              const phase = (time * 0.18 + index * 0.5) % 1;
+              particle.position.set(
+                -0.03 + index * 0.06 + phase * 0.025,
+                0.025 + phase * 0.07,
+                0.025
+              );
+            });
+            reducingEquivalents.forEach((particle, index) => {
+              const phase = (time * 0.17 + index / reducingEquivalents.length) % 1;
+              particle.position.set(
+                0.04 + phase * 0.08,
+                -0.03 - index * 0.02,
+                0.027
+              );
+            });
+          };
+        } else if (id === "mitochondria" || id === "electronTransport") {
+          const electrons = Array.from({ length: 5 }, () =>
+            addAnimationParticle(animationMaterials.electron, 0.009)
+          );
+          const pumpedProtons = Array.from({ length: 4 }, () =>
+            addAnimationParticle(animationMaterials.energy, 0.012)
+          );
+          const returningProtons = Array.from({ length: 3 }, () =>
+            addAnimationParticle(animationMaterials.energy, 0.012)
+          );
+          const atpParticles = Array.from({ length: 3 }, () =>
+            addAnimationParticle(animationMaterials.protein, 0.014)
+          );
+          animationUpdater = (time) => {
+            electrons.forEach((particle, index) => {
+              const phase = (time * 0.23 + index / electrons.length) % 1;
+              particle.position.set(
+                -0.065 + phase * 0.13,
+                -0.03,
+                0.034 + Math.sin(phase * Math.PI) * 0.003
+              );
+            });
+            pumpedProtons.forEach((particle, index) => {
+              const phase = (time * 0.2 + index / pumpedProtons.length) % 1;
+              particle.position.set(
+                (index - 1.5) * 0.028,
+                -0.03,
+                0.022 + phase * 0.016
+              );
+            });
+            returningProtons.forEach((particle, index) => {
+              const phase = (time * 0.2 + index / returningProtons.length) % 1;
+              particle.position.set(
+                (index - 1) * 0.028,
+                0.03,
+                0.041 - phase * 0.016
+              );
+            });
+            atpParticles.forEach((particle, index) => {
+              const phase = (time * 0.22 + index / atpParticles.length) % 1;
+              particle.position.set(
+                0.042 + Math.sin(phase * Math.PI * 2) * 0.012,
+                0.03 - phase * 0.03,
+                0.028 - phase * 0.012
+              );
+              particle.scale.setScalar(0.007 + Math.sin(phase * Math.PI) * 0.005);
+            });
+          };
+        } else if (
+          id === "er" ||
+          id === "roughERProtein" ||
+          id === "smoothERLipids" ||
+          id === "erCalcium" ||
+          id === "erDetox"
+        ) {
+          const addERGuide = (points, color) => {
+            const curve = new THREE.CatmullRomCurve3(
+              points.map(([x, y, z]) => new THREE.Vector3(x, y, z))
+            );
+            const guide = new THREE.Mesh(
+              new THREE.TubeGeometry(curve, 48, 0.0045, 6, false),
+              new THREE.MeshBasicMaterial({
+                color,
+                transparent: true,
+                opacity: 0.88,
+                depthTest: false
+              })
+            );
+            guide.renderOrder = 8;
+            animationRoot.add(guide);
+            return curve;
+          };
+          const roughPath = addERGuide(roughERPaths[0], 0xff8db2);
+          const smoothPath = addERGuide(smoothERPaths[0], 0xffd18a);
+          addAnimationLabel("RAUES ER\nRibosomen", -0.23, 0.26, 0.19);
+          addAnimationLabel("GLATTES ER\nohne Ribosomen", 0.32, 0.26, 0.2);
+
+          if (id === "er" || id === "roughERProtein") {
+            addAnimationLabel("Faltung\nim ER-Lumen", 0.02, -0.22, 0.16);
+            const ribosomes = Array.from({ length: 4 }, (_, index) => {
+              const position = roughPath.getPointAt(0.2 + index * 0.18);
+              const subunits = [
+                addAnimationParticle(animationMaterials.channel, 0.014),
+                addAnimationParticle(animationMaterials.protein, 0.01)
+              ];
+              subunits[0].position.copy(position).add(new THREE.Vector3(0, 0.02, 0.018));
+              subunits[1].position.copy(position).add(new THREE.Vector3(0, 0.005, 0.02));
+              return subunits;
+            });
+            const nascentProteins = Array.from({ length: 5 }, () =>
+              addAnimationParticle(animationMaterials.protein, 0.009)
+            );
+            animationUpdater = (time) => {
+              nascentProteins.forEach((particle, index) => {
+                const progress = (time * 0.16 + index / nascentProteins.length) % 1;
+                particle.position.copy(roughPath.getPointAt(0.08 + progress * 0.78));
+                particle.position.z += 0.018 + Math.sin(progress * Math.PI) * 0.008;
+              });
+              ribosomes.forEach((subunits, index) => {
+                const position = roughPath.getPointAt(0.2 + index * 0.18);
+                subunits[0].position.set(position.x, position.y + 0.02, position.z + 0.018);
+                subunits[1].position.set(position.x, position.y + 0.005, position.z + 0.02);
+              });
+            };
+          } else if (id === "smoothERLipids") {
+            addAnimationLabel("Lipide", 0.1, -0.22, 0.12);
+            addAnimationLabel("Steroid-\nvorstufen", 0.18, -0.13, 0.13);
+            const lipids = Array.from({ length: 6 }, (_, index) =>
+              addAnimationParticle(
+                index % 2 === 0 ? animationMaterials.lipid : animationMaterials.steroid,
+                index % 2 === 0 ? 0.011 : 0.009
+              )
+            );
+            animationUpdater = (time) => {
+              lipids.forEach((particle, index) => {
+                const progress = (time * 0.12 + index / lipids.length) % 1;
+                particle.position.copy(smoothPath.getPointAt(progress));
+                particle.position.z += 0.02 + (index % 2) * 0.012;
+              });
+            };
+          } else if (id === "erCalcium") {
+            addAnimationLabel("Ca²⁺-Speicherung\nim ER-Lumen", 0.08, -0.22, 0.2);
+            addAnimationLabel("Signal: Freisetzung\nins Cytosol", 0.43, 0.04, 0.19);
+            const calcium = Array.from({ length: 5 }, (_, index) =>
+              addAnimationParticle(animationMaterials.calcium, 0.009)
+            );
+            animationUpdater = (time) => {
+              calcium.forEach((particle, index) => {
+                const phase = (time * 0.1 + index / calcium.length) % 1;
+                const storage = smoothPath.getPointAt(0.2 + (index % 3) * 0.22);
+                if (phase < 0.45) {
+                  particle.position.copy(smoothPath.getPointAt(phase / 0.45));
+                  particle.position.z += 0.018;
+                } else if (phase < 0.72) {
+                  particle.position.copy(storage);
+                  particle.position.z += 0.02;
+                } else {
+                  const release = (phase - 0.72) / 0.28;
+                  particle.position.set(
+                    storage.x + release * (0.035 + index * 0.008),
+                    storage.y + release * (index - 2) * 0.022,
+                    storage.z + 0.02 + release * 0.07
+                  );
+                }
+              });
+            };
+          } else {
+            addAnimationLabel("Substrat", -0.04, -0.22, 0.12);
+            addAnimationLabel("verändertes Produkt", 0.4, -0.22, 0.2);
+            const substrates = Array.from({ length: 3 }, () =>
+              addAnimationParticle(animationMaterials.debris, 0.011)
+            );
+            const products = Array.from({ length: 3 }, () =>
+              addAnimationParticle(animationMaterials.detox, 0.011)
+            );
+            animationUpdater = (time) => {
+              substrates.forEach((particle, index) => {
+                const progress = (time * 0.14 + index / substrates.length) % 1;
+                particle.position.set(-0.22 + progress * 0.28, 0.02 + index * 0.025, 0.05);
+              });
+              products.forEach((particle, index) => {
+                const progress = (time * 0.14 + index / products.length) % 1;
+                particle.position.set(0.05 + progress * 0.24, -0.02 - index * 0.025, 0.08);
+              });
+            };
+          }
+        } else if (id === "golgi") {
+          const vesicles = Array.from({ length: 3 }, () =>
+            addAnimationParticle(animationMaterials.cargo, 0.042)
+          );
+          animationUpdater = (time) => {
+            vesicles.forEach((vesicle, index) => {
+              const progress = (time * 0.2 + index / vesicles.length) % 1;
+              vesicle.position.set(
+                0.08 + progress * 0.38,
+                -0.02 + progress * 0.12,
+                0.035 + Math.sin(progress * Math.PI) * 0.045
+              );
+            });
+          };
+        } else if (id === "ribosomes" || id === "ribosomeTranslation") {
+          const aminoAcids = Array.from({ length: 7 }, () =>
+            addAnimationParticle(animationMaterials.protein, 0.022)
+          );
+          animationUpdater = (time) => {
+            aminoAcids.forEach((particle, index) => {
+              const progress = (time * 0.22 - index * 0.1 + 1) % 1;
+              particle.position.set(
+                0.045 + progress * 0.2,
+                0.025 + index * 0.018 + Math.sin(progress * Math.PI * 2) * 0.018,
+                0.055 + index * 0.009
+              );
+            });
+          };
+        } else if (id === "cytoskeleton" || id === "cytoskeletalTransport") {
+          const cargo = Array.from({ length: 3 }, () =>
+            addAnimationParticle(animationMaterials.cargo, 0.027)
+          );
+          animationUpdater = (time) => {
+            cargo.forEach((particle, index) => {
+              const progress = (time * 0.12 + index / cargo.length) % 1;
+              particle.position.copy(transportTrack.getPointAt(progress));
+            });
+          };
+        } else if (id === "vesicles" || id === "vesicleTransport") {
+          const cargo = Array.from({ length: 4 }, () =>
+            addAnimationParticle(animationMaterials.cargo, 0.03)
+          );
+          animationUpdater = (time) => {
+            cargo.forEach((particle, index) => {
+              const progress = (time * 0.18 + index / cargo.length) % 1;
+              particle.position.set(
+                -0.3 + progress * 0.6,
+                0.12 - Math.sin(progress * Math.PI) * 0.18,
+                0.04
+              );
+            });
+          };
+        } else if (id === "peroxisomes" || id === "peroxisomeOxidation") {
+          const substrates = Array.from({ length: 3 }, () =>
+            addAnimationParticle(animationMaterials.cargo, 0.024)
+          );
+          const products = Array.from({ length: 3 }, () =>
+            addAnimationParticle(animationMaterials.recycled, 0.022)
+          );
+          animationUpdater = (time) => {
+            substrates.forEach((particle, index) => {
+              const progress = (time * 0.24 + index / substrates.length) % 1;
+              particle.position.set(-0.2 + progress * 0.18, (index - 1) * 0.045, 0.02);
+            });
+            products.forEach((particle, index) => {
+              const progress = (time * 0.24 + index / products.length) % 1;
+              particle.position.set(0.02 + progress * 0.2, (index - 1) * 0.05, 0.02);
+            });
+          };
+        } else if (id === "motorProteins" || id === "motorProteinTransport") {
+          const motorHeads = [
+            addAnimationParticle(animationMaterials.protein, 0.025),
+            addAnimationParticle(animationMaterials.protein, 0.025)
+          ];
+          const cargo = addAnimationParticle(animationMaterials.cargo, 0.04);
+          animationUpdater = (time) => {
+            const step = Math.sin(time * 8) * 0.025;
+            motorHeads[0].position.set(step, -0.02, 0);
+            motorHeads[1].position.set(-step, 0.02, 0);
+            cargo.position.set(0.04, 0.12, 0);
+          };
+        } else if (id === "lysosomes") {
+          const debris = Array.from({ length: 4 }, (_, index) =>
+            addAnimationParticle(animationMaterials.debris, 0.035, new THREE.Vector3(
+              Math.cos(index * Math.PI / 2) * 0.07,
+              Math.sin(index * Math.PI / 2) * 0.06,
+              0.02
+            ))
+          );
+          const recycled = Array.from({ length: 4 }, () =>
+            addAnimationParticle(animationMaterials.recycled, 0.022)
+          );
+          animationUpdater = (time) => {
+            debris.forEach((particle, index) => {
+              const phase = (time * 0.22 + index * 0.22) % 1;
+              particle.scale.setScalar(0.035 * (1 - phase * 0.85));
+            });
+            recycled.forEach((particle, index) => {
+              const phase = (time * 0.2 + index / recycled.length) % 1;
+              const angle = (index / recycled.length) * Math.PI * 2;
+              particle.position.set(
+                Math.cos(angle) * (0.04 + phase * 0.22),
+                Math.sin(angle) * (0.04 + phase * 0.18),
+                0.06 + phase * 0.08
+              );
+            });
+          };
+        }
+
+        animationUpdater(0);
+        focusHalo.position.copy(origin);
+        focusHalo.scale.setScalar(haloSizes[focusId]);
+        focusHalo.visible = true;
+      }
+
+      const detailPanel = document.querySelector("#detail-panel");
+      const exploreToggle = document.querySelector("#explore-toggle");
+      const exploreHelp = document.querySelector("#explore-help");
+      const tissueToggle = document.querySelector("#tissue-toggle");
+      const tissueStatus = document.querySelector("#tissue-status");
+      const savedView = { camera: null, target: null };
+      let tissueMode = false;
+      let tissuePreviousView = null;
+      const selectedWorldPosition = new THREE.Vector3();
+      const controlPanel = document.querySelector(".panel");
+      let selectedOrganelle = null;
+      let restoringView = false;
+      let explorationMode = false;
+      let freeYaw = 0;
+      let freePitch = 0;
+      let freeViewDistance = 1;
+      let lookPointer = null;
+      const movementKeys = new Set();
+      let destinationCameraPosition = camera.position.clone();
+      let destinationTarget = controls.target.clone();
+      let transitioning = false;
+
+      function positionDetailPanel() {
+        if (detailPanel.hidden) return;
+        if (window.innerWidth <= 1200) {
+          detailPanel.style.removeProperty("left");
+          detailPanel.style.removeProperty("right");
+          detailPanel.style.removeProperty("top");
+          return;
+        }
+
+        const projected = selectedWorldPosition.clone().project(camera);
+        const margin = 16;
+        const panelWidth = detailPanel.offsetWidth;
+        const panelHeight = detailPanel.offsetHeight;
+        const anchorY = ((1 - projected.y) / 2) * window.innerHeight;
+        const left = window.innerWidth - panelWidth - margin;
+        const top = THREE.MathUtils.clamp(
+          anchorY - panelHeight / 2,
+          margin,
+          Math.max(margin, window.innerHeight - panelHeight - margin)
+        );
+        detailPanel.style.left = `${left}px`;
+        detailPanel.style.right = "auto";
+        detailPanel.style.top = `${top}px`;
+      }
+
+      function setTissueMode(active) {
+        if (tissueMode === active) return;
+        tissueMode = active;
+        tissueContext.visible = active;
+        tissueToggle.setAttribute("aria-pressed", String(active));
+        tissueToggle.textContent = active ? "Gewebeansicht beenden" : "Gewebeansicht starten";
+        tissueStatus.hidden = !active;
+        if (active) {
+          tissuePreviousView = {
+            camera: destinationCameraPosition.clone(),
+            target: destinationTarget.clone()
+          };
+          controls.maxDistance = 12;
+          destinationTarget.set(0, 0, 0);
+          destinationCameraPosition.set(0, 0.2, 10.8);
+        } else if (tissuePreviousView) {
+          controls.maxDistance = 8;
+          destinationCameraPosition.copy(tissuePreviousView.camera);
+          destinationTarget.copy(tissuePreviousView.target);
+          tissuePreviousView = null;
+        }
+        transitioning = true;
+      }
+
+      function focusOrganelle(id, anchor = focusAnchors[id], hitPoint = null) {
+        const info = details[id];
+        if (!info || !anchor) return;
+        if (explorationMode) setExplorationMode(false);
+
+        if (selectedOrganelle === null && !restoringView) {
+          savedView.camera = camera.position.clone();
+          savedView.target = controls.target.clone();
+        }
+        restoringView = false;
+        selectedOrganelle = id;
+        updateProcessOptions(id);
+        processLabel.textContent = `Passende Prozesse: ${info.name}`;
+        detailPanel.hidden = false;
+        controlPanel.classList.toggle("compact", window.innerWidth <= 1200);
+        detailPanel.querySelector(".eyebrow").textContent =
+          id === "cytoplasm" ? "Zellbereich im Fokus" : "Organell im Fokus";
+        document.querySelector("#detail-title").textContent = info.name;
+        document.querySelector("#detail-structure").textContent = info.structure;
+        document.querySelector("#detail-function").textContent = info.function;
+        document.querySelector("#detail-size").textContent = info.size;
+        document.querySelector("#detail-volume").textContent = info.volume;
+        document.querySelector("#process-title").textContent = "Funktion im 3D-Modell";
+        document.querySelector("#process-caption").textContent = info.caption;
+        for (const button of organelleList.querySelectorAll("button")) {
+          button.setAttribute("aria-pressed", String(button.dataset.organelle === id));
+        }
+
+        const target = hitPoint ? hitPoint.clone() : new THREE.Vector3();
+        if (!hitPoint) anchor.getWorldPosition(target);
+        selectedWorldPosition.copy(target);
+        configureFunctionalAnimation(id, target, anchor);
+        const direction = camera.position.clone().sub(controls.target).normalize();
+        const focusDistances = {
+          membrane: 0.9,
+          cytoplasm: 0.72,
+          nucleus: 0.85,
+          mitochondria: 0.48,
+          er: 1.05,
+          golgi: 0.58,
+          ribosomes: 0.38,
+          lysosomes: 0.48,
+          cytoskeleton: 1.1,
+          vesicles: 0.42,
+          peroxisomes: 0.48,
+          motorProteins: 0.45
+        };
+        const focusDistance = focusDistances[id];
+        const viewTarget = target.clone();
+        const cameraRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).normalize();
+        const cameraUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).normalize();
+        const worldPerPixel =
+          focusDistance * 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / window.innerHeight;
+        if (window.innerWidth <= 1200) {
+          const verticalShift = Math.min(window.innerHeight * 0.2, detailPanel.offsetHeight * 0.45);
+          viewTarget.addScaledVector(cameraUp, -verticalShift * worldPerPixel);
+        } else {
+          const margin = 16;
+          const panelLeft = window.innerWidth - detailPanel.offsetWidth - margin;
+          const navigationRight = controlPanel.getBoundingClientRect().right;
+          const desiredScreenX = (navigationRight + panelLeft) / 2;
+          const viewportCenterX = window.innerWidth / 2;
+          viewTarget.addScaledVector(cameraRight, (viewportCenterX - desiredScreenX) * worldPerPixel);
+        }
+        destinationTarget = viewTarget;
+        destinationCameraPosition = viewTarget.clone().add(direction.multiplyScalar(focusDistance));
+        transitioning = true;
+      }
+
+      processSelect.addEventListener("change", () => {
+        const processId = processSelect.value;
+        const process = cellProcesses[processId];
+        if (!process) {
+          if (tissueMode) setTissueMode(false);
+          if (selectedOrganelle !== null) {
+            const info = details[selectedOrganelle];
+            document.querySelector("#process-title").textContent = "Funktion im 3D-Modell";
+            document.querySelector("#process-caption").textContent = info.caption;
+            configureFunctionalAnimation(
+              selectedOrganelle,
+              selectedWorldPosition,
+              focusAnchors[selectedOrganelle]
+            );
+          }
+          return;
+        }
+
+        if (tissueMode && !process.tissue) setTissueMode(false);
+        focusOrganelle(process.focus);
+        document.querySelector("#process-title").textContent = process.title;
+        document.querySelector("#process-caption").textContent = process.caption;
+        configureFunctionalAnimation(
+          processId,
+          process.globalAnimation ? new THREE.Vector3() : selectedWorldPosition,
+          focusAnchors[process.focus],
+          process.focus
+        );
+        if (process.tissue) {
+          if (tissueMode) setTissueMode(false);
+          setTissueMode(true);
+        }
+      });
+
+      function setExplorationMode(active) {
+        if (explorationMode === active) return;
+        if (active && tissueMode) setTissueMode(false);
+        if (active && selectedOrganelle !== null) closeDetail();
+        explorationMode = active;
+        controls.enabled = !active;
+        exploreToggle.setAttribute("aria-pressed", String(active));
+        exploreToggle.textContent = active ? "Innenansicht beenden" : "Innenansicht starten";
+        exploreHelp.hidden = !active;
+        movementKeys.clear();
+        lookPointer = null;
+        if (active) {
+          transitioning = false;
+          restoringView = false;
+          const direction = camera.getWorldDirection(new THREE.Vector3());
+          freeYaw = Math.atan2(-direction.x, -direction.z);
+          freePitch = Math.asin(THREE.MathUtils.clamp(direction.y, -0.98, 0.98));
+          freeViewDistance = Math.max(camera.position.distanceTo(controls.target), 0.5);
+          renderer.domElement.focus();
+        }
+      }
+
+      function closeDetail() {
+        if (selectedOrganelle === null) return;
+        if (tissueMode) setTissueMode(false);
+        selectedOrganelle = null;
+        processSelect.value = "";
+        updateProcessOptions();
+        processLabel.textContent = "Zellprozess im 3D-Modell";
+        detailPanel.hidden = true;
+        controlPanel.classList.remove("compact");
+        animationRoot.visible = false;
+        clearFunctionalAnimation();
+        focusHalo.visible = false;
+        animationUpdater = () => {};
+        for (const button of organelleList.querySelectorAll("button")) {
+          button.setAttribute("aria-pressed", "false");
+        }
+        restoringView = true;
+        destinationCameraPosition = savedView.camera
+          ? savedView.camera.clone()
+          : initialCameraPosition.clone();
+        destinationTarget = savedView.target
+          ? savedView.target.clone()
+          : new THREE.Vector3(0, 0, 0);
+        transitioning = true;
+      }
+
+      let pointerStart = null;
+      renderer.domElement.addEventListener("pointerdown", (event) => {
+        if (explorationMode) {
+          if (event.button === 0) {
+            lookPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+            renderer.domElement.setPointerCapture(event.pointerId);
+          }
+          return;
+        }
+        if (event.button !== 0) return;
+        pointerStart = { x: event.clientX, y: event.clientY };
+      });
+      renderer.domElement.addEventListener("pointermove", (event) => {
+        if (!explorationMode || !lookPointer || event.pointerId !== lookPointer.id) return;
+        const deltaX = event.clientX - lookPointer.x;
+        const deltaY = event.clientY - lookPointer.y;
+        lookPointer.x = event.clientX;
+        lookPointer.y = event.clientY;
+        freeYaw -= deltaX * 0.003;
+        freePitch = THREE.MathUtils.clamp(freePitch - deltaY * 0.003, -1.5, 1.5);
+        const direction = new THREE.Vector3(
+          -Math.sin(freeYaw) * Math.cos(freePitch),
+          Math.sin(freePitch),
+          -Math.cos(freeYaw) * Math.cos(freePitch)
+        );
+        controls.target.copy(camera.position).addScaledVector(direction, freeViewDistance);
+        camera.lookAt(controls.target);
+      });
+      renderer.domElement.addEventListener("pointerup", (event) => {
+        if (explorationMode) {
+          if (lookPointer && renderer.domElement.hasPointerCapture(event.pointerId)) {
+            renderer.domElement.releasePointerCapture(event.pointerId);
+          }
+          lookPointer = null;
+          return;
+        }
+        if (!pointerStart) return;
+        const moved = Math.hypot(
+          event.clientX - pointerStart.x,
+          event.clientY - pointerStart.y
+        );
+        pointerStart = null;
+        if (moved > 5) return;
+
+        const bounds = renderer.domElement.getBoundingClientRect();
+        const pointer = new THREE.Vector2(
+          ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
+          -((event.clientY - bounds.top) / bounds.height) * 2 + 1
+        );
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(pointer, camera);
+        const intersections = raycaster.intersectObjects(interactiveMeshes, false);
+        const hit = intersections.find(
+          (intersection) => intersection.object.userData.organelleId !== "membrane"
+        ) || intersections[0];
+        if (hit) {
+          if (tissueMode) setTissueMode(false);
+          processSelect.value = "";
+          focusOrganelle(
+            hit.object.userData.organelleId,
+            hit.object.userData.organelleAnchor,
+            hit.object.userData.organelleId === "membrane" ? hit.point : null
+          );
+        }
+      });
+      renderer.domElement.addEventListener("pointerleave", () => { pointerStart = null; });
+      renderer.domElement.addEventListener("contextmenu", (event) => event.preventDefault());
+      renderer.domElement.addEventListener("wheel", (event) => {
+        if (!explorationMode) return;
+        event.preventDefault();
+        const direction = camera.getWorldDirection(new THREE.Vector3());
+        const distance = -Math.sign(event.deltaY) * 0.18;
+        camera.position.addScaledVector(direction, distance);
+        controls.target.addScaledVector(direction, distance);
+      }, { passive: false });
+
+      document.querySelector("#close-detail").addEventListener("click", closeDetail);
+      exploreToggle.addEventListener("click", () => setExplorationMode(!explorationMode));
+      tissueToggle.addEventListener("click", () => {
+        if (tissueMode && cellProcesses[processSelect.value]?.tissue) {
+          processSelect.value = "";
+          processSelect.dispatchEvent(new Event("change"));
+          return;
+        }
+        setTissueMode(!tissueMode);
+      });
+      window.addEventListener("keydown", (event) => {
+        if (!explorationMode) return;
+        const key = event.key.toLowerCase();
+        if (["w", "a", "s", "d", "q", "e", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+          event.preventDefault();
+          movementKeys.add(key);
+        }
+      });
+      window.addEventListener("keyup", (event) => movementKeys.delete(event.key.toLowerCase()));
+      window.addEventListener("blur", () => movementKeys.clear());
+      document.querySelector("#reset-view").addEventListener("click", () => {
+        setExplorationMode(false);
+        if (tissueMode) setTissueMode(false);
+        closeDetail();
+        if (selectedOrganelle === null) {
+          destinationCameraPosition = initialCameraPosition.clone();
+          destinationTarget.set(0, 0, 0);
+          transitioning = true;
+        }
+      });
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        controlPanel.classList.toggle("compact", selectedOrganelle !== null && window.innerWidth <= 1200);
+      });
+
+      const clock = new THREE.Clock();
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const motorTrackAxis = new THREE.Vector3(1, 0, 0);
+      let elapsed = 0;
+      renderer.setAnimationLoop(() => {
+        const delta = Math.min(clock.getDelta(), 0.05);
+        elapsed += delta;
+        if (!reduceMotion) {
+          for (const carrier of movingCarriers) {
+            if (selectedOrganelle !== "motorProteins" && selectedOrganelle !== "vesicles") {
+              const progress = (elapsed * 0.045 + carrier.offset) % 1;
+              carrier.carrier.position.copy(carrier.route.getPointAt(progress));
+              const tangent = carrier.route.getTangentAt(progress).normalize();
+              carrier.carrier.quaternion.setFromUnitVectors(motorTrackAxis, tangent);
+            }
+            for (const head of carrier.heads) {
+              head.mesh.position.set(
+                head.side * Math.sin(elapsed * 8 + carrier.offset) * 0.009,
+                head.side * 0.016,
+                0
+              );
+            }
+          }
+          for (const cisterna of golgiCisternae) {
+            const wave = Math.sin(elapsed * 1.15 + cisterna.phase);
+            cisterna.group.position.set(
+              cisterna.basePosition.x + Math.sin(elapsed * 0.8 + cisterna.phase) * 0.0025,
+              cisterna.basePosition.y + wave * 0.002,
+              cisterna.basePosition.z + Math.cos(elapsed * 0.7 + cisterna.phase) * 0.0025
+            );
+            cisterna.group.rotation.z = cisterna.baseRotation + wave * 0.018;
+            cisterna.group.scale.set(
+              1 + wave * 0.014,
+              1 + Math.cos(elapsed + cisterna.phase) * 0.018,
+              1 + Math.sin(elapsed * 0.9 + cisterna.phase) * 0.022
+            );
+          }
+          for (const vesicle of secretoryVesicles) {
+            const progress = (elapsed * 0.11 + vesicle.phaseOffset) % 1;
+            const routeProgress = Math.min(progress / cargoReleaseProgress, 1);
+            vesicle.group.position.copy(secretoryRoute.getPointAt(routeProgress));
+            const fade = THREE.MathUtils.clamp(
+              (progress - cargoReleaseProgress) / 0.08,
+              0,
+              1
+            );
+            vesicle.shell.scale.setScalar(1 - fade);
+            const releaseDistance = Math.max(0, progress - cargoReleaseProgress);
+            const outwardDirection = secretoryRoute.getTangentAt(1).normalize();
+            vesicle.cargoParticles.forEach((cargo, index) => {
+              const spread = index - 1;
+              cargo.position.set(
+                spread * 0.012 + outwardDirection.x * releaseDistance * 1.8,
+                (spread % 2) * 0.014 + outwardDirection.y * releaseDistance * 1.8,
+                0.008 + outwardDirection.z * releaseDistance * 1.8
+              );
+            });
+          }
+        }
+        if (explorationMode && movementKeys.size > 0) {
+          const forward = camera.getWorldDirection(new THREE.Vector3());
+          forward.y = 0;
+          forward.normalize();
+          const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+          const movement = new THREE.Vector3();
+          if (movementKeys.has("w") || movementKeys.has("arrowup")) movement.add(forward);
+          if (movementKeys.has("s") || movementKeys.has("arrowdown")) movement.sub(forward);
+          if (movementKeys.has("d") || movementKeys.has("arrowright")) movement.add(right);
+          if (movementKeys.has("a") || movementKeys.has("arrowleft")) movement.sub(right);
+          if (movementKeys.has("e")) movement.y += 1;
+          if (movementKeys.has("q")) movement.y -= 1;
+          if (movement.lengthSq() > 0) {
+            const speed = (movementKeys.has("shift") ? 2.4 : 0.85) * delta;
+            movement.normalize().multiplyScalar(speed);
+            camera.position.add(movement);
+            controls.target.add(movement);
+          }
+        }
+        if (transitioning) {
+          const ease = reduceMotion ? 1 : 1 - Math.exp(-7 * delta);
+          camera.position.lerp(destinationCameraPosition, ease);
+          controls.target.lerp(destinationTarget, ease);
+          if (
+            camera.position.distanceToSquared(destinationCameraPosition) < 0.0004 &&
+            controls.target.distanceToSquared(destinationTarget) < 0.0004
+          ) {
+            camera.position.copy(destinationCameraPosition);
+            controls.target.copy(destinationTarget);
+            transitioning = false;
+            restoringView = false;
+          }
+        }
+        if (!reduceMotion && animationRoot.visible) animationUpdater(elapsed);
+        if (focusHalo.visible) {
+          focusHalo.lookAt(camera.position);
+          const pulse = reduceMotion ? 1 : 1 + Math.sin(elapsed * 2) * 0.035;
+          focusHalo.scale.setScalar(haloSizes[selectedOrganelle] * pulse);
+        }
+        if (!explorationMode) controls.update();
+        positionDetailPanel();
+        renderer.render(scene, camera);
+      });
+    } catch (error) {
+      errorElement.hidden = false;
+      errorElement.textContent =
+        "Das 3D-Modell konnte nicht gestartet werden. Bitte öffne diese Datei über einen lokalen Webserver und prüfe deine Internetverbindung. " +
+        error.message;
+      console.error(error);
+    }
+  </script>
+</body>
+</html>
