@@ -255,6 +255,12 @@
         padding: 0.65rem 0.8rem;
       }
 
+      .panel {
+        max-height: calc(100dvh - 1.2rem);
+        overflow-y: auto;
+        scroll-padding: 0.5rem;
+      }
+
       .panel p { display: none; }
       .panel #explore-help:not([hidden]) { display: block; }
       .panel #tissue-status:not([hidden]) { display: block; }
@@ -274,6 +280,9 @@
       h1 { margin: 0; font-size: 1rem; }
       .panel.compact { max-height: 42vh; overflow-y: auto; }
       .detail-panel { top: auto; right: 0.6rem; bottom: 0.6rem; left: 0.6rem; width: auto; max-height: 52vh; padding: 1rem; }
+    }
+    @media (max-width: 1200px) and (pointer: coarse) {
+      .panel button, .panel select, .detail-panel button { min-height: 44px; }
     }
   </style>
 </head>
@@ -322,7 +331,7 @@
     </section>
     <aside id="detail-panel" class="detail-panel" role="dialog" aria-modal="false" aria-labelledby="detail-title" hidden>
       <p class="eyebrow">Organell im Fokus</p>
-      <h2 id="detail-title"></h2>
+      <h2 id="detail-title" tabindex="-1"></h2>
       <h3>Aufbau</h3>
       <p id="detail-structure"></p>
       <h3>Funktion</h3>
@@ -645,10 +654,14 @@
         button.textContent = info.name;
         button.dataset.organelle = id;
         button.setAttribute("aria-pressed", "false");
-        button.addEventListener("click", () => {
+        button.addEventListener("click", (event) => {
           if (tissueMode) setTissueMode(false);
           processSelect.value = "";
           focusOrganelle(id);
+          if (event.detail === 0 && !detailPanel.hidden) {
+            detailPanel.scrollTop = 0;
+            detailTitle.focus();
+          }
         });
         organelleList.appendChild(button);
       }
@@ -2872,6 +2885,7 @@
       }
 
       const detailPanel = document.querySelector("#detail-panel");
+      const detailTitle = document.querySelector("#detail-title");
       const exploreToggle = document.querySelector("#explore-toggle");
       const exploreHelp = document.querySelector("#explore-help");
       const tissueToggle = document.querySelector("#tissue-toggle");
@@ -2959,7 +2973,7 @@
         controlPanel.classList.toggle("compact", window.innerWidth <= 1200);
         detailPanel.querySelector(".eyebrow").textContent =
           id === "cytoplasm" ? "Zellbereich im Fokus" : "Organell im Fokus";
-        document.querySelector("#detail-title").textContent = info.name;
+        detailTitle.textContent = info.name;
         document.querySelector("#detail-structure").textContent = info.structure;
         document.querySelector("#detail-function").textContent = info.function;
         document.querySelector("#detail-size").textContent = info.size;
@@ -3067,8 +3081,9 @@
         }
       }
 
-      function closeDetail() {
+      function closeDetail(restoreFocus = detailPanel.contains(document.activeElement)) {
         if (selectedOrganelle === null) return;
+        const selectedButton = organelleList.querySelector('button[aria-pressed="true"]');
         if (tissueMode) setTissueMode(false);
         selectedOrganelle = null;
         processSelect.value = "";
@@ -3076,6 +3091,7 @@
         processLabel.textContent = "Zellprozess im 3D-Modell";
         detailPanel.hidden = true;
         controlPanel.classList.remove("compact");
+        if (restoreFocus) selectedButton?.focus();
         animationRoot.visible = false;
         clearFunctionalAnimation();
         focusHalo.visible = false;
@@ -3169,7 +3185,7 @@
         controls.target.addScaledVector(direction, distance);
       }, { passive: false });
 
-      document.querySelector("#close-detail").addEventListener("click", closeDetail);
+      document.querySelector("#close-detail").addEventListener("click", () => closeDetail());
       exploreToggle.addEventListener("click", () => setExplorationMode(!explorationMode));
       tissueToggle.addEventListener("click", () => {
         if (tissueMode && cellProcesses[processSelect.value]?.tissue) {
@@ -3180,13 +3196,25 @@
         setTissueMode(!tissueMode);
       });
       window.addEventListener("keydown", (event) => {
-        if (!explorationMode) return;
+        if (event.defaultPrevented || event.target === processSelect) return;
+        if (event.key === "Escape" && selectedOrganelle !== null) {
+          event.preventDefault();
+          closeDetail(true);
+        } else if (event.key === "Escape" && explorationMode) {
+          event.preventDefault();
+          setExplorationMode(false);
+          exploreToggle.focus();
+        }
+      });
+      renderer.domElement.addEventListener("keydown", (event) => {
+        if (!explorationMode || event.altKey || event.ctrlKey || event.metaKey) return;
         const key = event.key.toLowerCase();
-        if (["w", "a", "s", "d", "q", "e", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+        if (["w", "a", "s", "d", "q", "e", "arrowup", "arrowdown", "arrowleft", "arrowright", "shift"].includes(key)) {
           event.preventDefault();
           movementKeys.add(key);
         }
       });
+      renderer.domElement.addEventListener("blur", () => movementKeys.clear());
       window.addEventListener("keyup", (event) => movementKeys.delete(event.key.toLowerCase()));
       window.addEventListener("blur", () => movementKeys.clear());
       document.querySelector("#reset-view").addEventListener("click", () => {
