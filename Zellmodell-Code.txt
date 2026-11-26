@@ -3081,8 +3081,9 @@
         }
       }
 
-      function closeDetail(restoreFocus = detailPanel.contains(document.activeElement)) {
+      function closeDetail() {
         if (selectedOrganelle === null) return;
+        const restoreFocus = detailPanel.contains(document.activeElement);
         const selectedButton = organelleList.querySelector('button[aria-pressed="true"]');
         if (tissueMode) setTissueMode(false);
         selectedOrganelle = null;
@@ -3199,7 +3200,7 @@
         if (event.defaultPrevented || event.target === processSelect) return;
         if (event.key === "Escape" && selectedOrganelle !== null) {
           event.preventDefault();
-          closeDetail(true);
+          closeDetail();
         } else if (event.key === "Escape" && explorationMode) {
           event.preventDefault();
           setExplorationMode(false);
