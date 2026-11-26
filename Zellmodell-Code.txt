@@ -281,74 +281,108 @@
       .panel.compact { max-height: 42vh; overflow-y: auto; }
       .detail-panel { top: auto; right: 0.6rem; bottom: 0.6rem; left: 0.6rem; width: auto; max-height: 52vh; padding: 1rem; }
     }
-    @media (max-width: 1200px) and (pointer: coarse) {
+    .mobile-action { display: none; }
+
+    @media (max-width: 767px), (max-width: 1200px) and (pointer: coarse) {
+      .panel, .panel.compact, .detail-panel {
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        padding: 0.35rem 0.55rem;
+      }
+
+      .panel, .panel.compact { max-height: 55dvh; }
+      .detail-panel { max-height: 48dvh; background: rgb(245 249 255 / 94%); }
+      .panel-header, .detail-header { display: flex; align-items: center; gap: 0.35rem; }
+      .panel-header h1, .detail-header h2 { flex: 1; min-width: 0; margin: 0; }
+      .detail-header h2 { font-size: 1rem; overflow-wrap: anywhere; }
+      .detail-panel .eyebrow, #close-detail { display: none; }
+      .panel-content, .detail-content { overflow-y: auto; min-height: 0; }
+      .panel-content { padding: 0 0.15rem 0.35rem; }
+      .detail-content { padding: 0 0.15rem 0.5rem; }
+      .detail-content > h3:first-child { margin-top: 0.35rem; }
+      .mobile-collapsed .panel-content, .mobile-collapsed .detail-content { display: none; }
+      .mobile-action { display: inline-block; flex: none; }
+      .detail-panel .mobile-action { margin-top: 0; }
       .panel button, .panel select, .detail-panel button { min-height: 44px; }
     }
   </style>
 </head>
 <body>
   <main class="viewer" aria-label="Interaktives 3D-Modell einer tierischen Zelle">
-    <section class="panel" aria-labelledby="title">
-      <h1 id="title">Tierische Zelle</h1>
-      <p>Drehen: ziehen · Zoomen: Mausrad · Verschieben: rechte Maustaste</p>
-      <div class="cell-scale"><strong>Ø ca. 10–30 µm</strong><span>typischer Richtwert für viele tierische Zellen</span></div>
-      <nav id="organelle-list" class="organelles" aria-label="Zellstruktur auswählen"></nav>
-      <div class="view-actions">
-        <button id="explore-toggle" type="button" aria-pressed="false" aria-controls="explore-help">Innenansicht starten</button>
-        <button id="tissue-toggle" type="button" aria-pressed="false" aria-controls="tissue-status">Gewebeansicht starten</button>
-        <button id="reset-view" type="button">Zelle zentrieren</button>
+    <section class="panel mobile-collapsed" aria-labelledby="title">
+      <div class="panel-header">
+        <h1 id="title">Tierische Zelle</h1>
+        <button id="menu-toggle" class="mobile-action" type="button" aria-expanded="false" aria-controls="panel-content">Menü</button>
       </div>
-      <p id="tissue-status" hidden aria-live="polite">Schematisches Gewebe: Nachbarzellen, Interstitium und extrazelluläre Matrix (ECM). Gap Junctions sind zelltypspezifisch.</p>
-      <label class="process-control" for="process-select">
-          <span id="process-label">Zellprozess im 3D-Modell</span>
-        <select id="process-select">
-          <option value="">Prozess auswählen …</option>
-          <option value="glycolysis">Glykolyse im Cytosol</option>
-          <option value="nuclearTranscription">Transkription und mRNA-Export</option>
-          <option value="citricCycle">Citratzyklus in der Matrix</option>
-          <option value="electronTransport">Elektronen- und Protonentransport</option>
-          <option value="golgiSecretion">Golgi-Transport in den Extrazellularraum</option>
-          <option value="phagocytosis">Phagocytose eines Bakteriums</option>
-          <option value="endosomalPathway">Endocytose über frühes und spätes Endosom</option>
-          <option value="autophagy">Autophagie beschädigter Organellen</option>
-          <option value="roughERProtein">Raues ER: Proteinsynthese und Faltung</option>
-          <option value="smoothERLipids">Glattes ER: Lipid- und Steroidbiosynthese</option>
-          <option value="erCalcium">Glattes ER: Calcium-Speicherung und -Freisetzung</option>
-          <option value="erDetox">Glattes ER: Entgiftung</option>
-          <option value="ribosomeTranslation">Translation am Ribosom</option>
-          <option value="cytoskeletalTransport">Vesikeltransport am Cytoskelett</option>
-          <option value="vesicleTransport">Vesikeltransport vom ER zum Golgi</option>
-          <option value="peroxisomeOxidation">Peroxisom: Fettsäureabbau und Entgiftung</option>
-          <option value="motorProteinTransport">Kinesin: schrittweiser Transport</option>
-          <option value="endocytosis">Endocytose</option>
-          <option value="exocytosis">Exocytose</option>
-          <option value="membraneTransport">Kanal- und Carriertransport</option>
-          <option value="paracrineSignal">Parakrine Signalübertragung an eine Nachbarzelle</option>
-          <option value="gapJunctionTransport">Stoffaustausch durch Gap Junctions</option>
-        </select>
-      </label>
-      <p id="explore-help" hidden aria-live="polite">WASD bewegen · Q/E hoch/runter · Maus ziehen zum Umsehen · Shift schneller</p>
-    </section>
-    <aside id="detail-panel" class="detail-panel" role="dialog" aria-modal="false" aria-labelledby="detail-title" hidden>
-      <p class="eyebrow">Organell im Fokus</p>
-      <h2 id="detail-title" tabindex="-1"></h2>
-      <h3>Aufbau</h3>
-      <p id="detail-structure"></p>
-      <h3>Funktion</h3>
-      <p id="detail-function"></p>
-      <div class="fact-grid" aria-label="Größenangaben">
-        <div class="fact"><span>Typische Größe</span><strong id="detail-size"></strong></div>
-        <div class="fact"><span>Anteil am Zellvolumen</span><strong id="detail-volume"></strong></div>
-      </div>
-      <p class="estimate-note">Grobe Richtwerte: Größe und Volumenanteil hängen stark von Zelltyp und Aktivität ab; die Anteile sind nicht exakt addierbar.</p>
-      <section class="animation-note" aria-labelledby="process-title">
-        <span class="animation-indicator" aria-hidden="true"></span>
-        <div>
-          <h3 id="process-title">Funktion im 3D-Modell</h3>
-          <p id="process-caption"></p>
+      <div id="panel-content" class="panel-content">
+        <p>Drehen: ziehen · Zoomen: Mausrad · Verschieben: rechte Maustaste</p>
+        <div class="cell-scale"><strong>Ø ca. 10–30 µm</strong><span>typischer Richtwert für viele tierische Zellen</span></div>
+        <nav id="organelle-list" class="organelles" aria-label="Zellstruktur auswählen"></nav>
+        <div class="view-actions">
+          <button id="explore-toggle" type="button" aria-pressed="false" aria-controls="explore-help">Innenansicht starten</button>
+          <button id="tissue-toggle" type="button" aria-pressed="false" aria-controls="tissue-status">Gewebeansicht starten</button>
+          <button id="reset-view" type="button">Zelle zentrieren</button>
         </div>
-      </section>
-      <button id="close-detail" type="button">Zur ganzen Zelle</button>
+        <p id="tissue-status" hidden aria-live="polite">Schematisches Gewebe: Nachbarzellen, Interstitium und extrazelluläre Matrix (ECM). Gap Junctions sind zelltypspezifisch.</p>
+        <label class="process-control" for="process-select">
+            <span id="process-label">Zellprozess im 3D-Modell</span>
+          <select id="process-select">
+            <option value="">Prozess auswählen …</option>
+            <option value="glycolysis">Glykolyse im Cytosol</option>
+            <option value="nuclearTranscription">Transkription und mRNA-Export</option>
+            <option value="citricCycle">Citratzyklus in der Matrix</option>
+            <option value="electronTransport">Elektronen- und Protonentransport</option>
+            <option value="golgiSecretion">Golgi-Transport in den Extrazellularraum</option>
+            <option value="phagocytosis">Phagocytose eines Bakteriums</option>
+            <option value="endosomalPathway">Endocytose über frühes und spätes Endosom</option>
+            <option value="autophagy">Autophagie beschädigter Organellen</option>
+            <option value="roughERProtein">Raues ER: Proteinsynthese und Faltung</option>
+            <option value="smoothERLipids">Glattes ER: Lipid- und Steroidbiosynthese</option>
+            <option value="erCalcium">Glattes ER: Calcium-Speicherung und -Freisetzung</option>
+            <option value="erDetox">Glattes ER: Entgiftung</option>
+            <option value="ribosomeTranslation">Translation am Ribosom</option>
+            <option value="cytoskeletalTransport">Vesikeltransport am Cytoskelett</option>
+            <option value="vesicleTransport">Vesikeltransport vom ER zum Golgi</option>
+            <option value="peroxisomeOxidation">Peroxisom: Fettsäureabbau und Entgiftung</option>
+            <option value="motorProteinTransport">Kinesin: schrittweiser Transport</option>
+            <option value="endocytosis">Endocytose</option>
+            <option value="exocytosis">Exocytose</option>
+            <option value="membraneTransport">Kanal- und Carriertransport</option>
+            <option value="paracrineSignal">Parakrine Signalübertragung an eine Nachbarzelle</option>
+            <option value="gapJunctionTransport">Stoffaustausch durch Gap Junctions</option>
+          </select>
+        </label>
+        <p id="explore-help" hidden aria-live="polite">WASD bewegen · Q/E hoch/runter · Maus ziehen zum Umsehen · Shift schneller</p>
+      </div>
+    </section>
+    <aside id="detail-panel" class="detail-panel mobile-collapsed" role="dialog" aria-modal="false" aria-labelledby="detail-title" hidden>
+      <p class="eyebrow">Organell im Fokus</p>
+      <div class="detail-header">
+        <h2 id="detail-title" tabindex="-1"></h2>
+        <button id="detail-toggle" class="mobile-action" type="button" aria-expanded="false" aria-controls="detail-content">Details</button>
+        <button id="close-mobile-detail" class="mobile-action" type="button" aria-label="Organell-Details schließen">✕</button>
+      </div>
+      <div id="detail-content" class="detail-content">
+        <h3>Aufbau</h3>
+        <p id="detail-structure"></p>
+        <h3>Funktion</h3>
+        <p id="detail-function"></p>
+        <div class="fact-grid" aria-label="Größenangaben">
+          <div class="fact"><span>Typische Größe</span><strong id="detail-size"></strong></div>
+          <div class="fact"><span>Anteil am Zellvolumen</span><strong id="detail-volume"></strong></div>
+        </div>
+        <p class="estimate-note">Grobe Richtwerte: Größe und Volumenanteil hängen stark von Zelltyp und Aktivität ab; die Anteile sind nicht exakt addierbar.</p>
+        <section class="animation-note" aria-labelledby="process-title">
+          <span class="animation-indicator" aria-hidden="true"></span>
+          <div>
+            <h3 id="process-title">Funktion im 3D-Modell</h3>
+            <p id="process-caption"></p>
+          </div>
+        </section>
+        <button id="close-detail" type="button">Zur ganzen Zelle</button>
+      </div>
     </aside>
     <p id="error" class="error" role="alert" hidden></p>
   </main>
@@ -2895,6 +2929,36 @@
       let tissuePreviousView = null;
       const selectedWorldPosition = new THREE.Vector3();
       const controlPanel = document.querySelector(".panel");
+      const menuToggle = document.querySelector("#menu-toggle");
+      const detailToggle = document.querySelector("#detail-toggle");
+      const mobilePanels = matchMedia("(max-width: 767px), (max-width: 1200px) and (pointer: coarse)");
+
+      function setPanelExpanded(panel, toggle, expanded) {
+        panel.classList.toggle("mobile-collapsed", !expanded);
+        toggle.setAttribute("aria-expanded", String(expanded));
+      }
+
+      function collapseMenu() {
+        if (!mobilePanels.matches) return;
+        if (controlPanel.contains(document.activeElement)) menuToggle.focus();
+        setPanelExpanded(controlPanel, menuToggle, false);
+      }
+
+      menuToggle.addEventListener("click", () => {
+        const open = menuToggle.getAttribute("aria-expanded") === "false";
+        if (open) {
+          if (detailPanel.contains(document.activeElement)) menuToggle.focus();
+          setPanelExpanded(detailPanel, detailToggle, false);
+        }
+        setPanelExpanded(controlPanel, menuToggle, open);
+      });
+
+      detailToggle.addEventListener("click", () => {
+        const open = detailToggle.getAttribute("aria-expanded") === "false";
+        if (open) collapseMenu();
+        setPanelExpanded(detailPanel, detailToggle, open);
+      });
+
       let selectedOrganelle = null;
       let restoringView = false;
       let explorationMode = false;
@@ -2970,6 +3034,7 @@
         updateProcessOptions(id);
         processLabel.textContent = `Passende Prozesse: ${info.name}`;
         detailPanel.hidden = false;
+        collapseMenu();
         controlPanel.classList.toggle("compact", window.innerWidth <= 1200);
         detailPanel.querySelector(".eyebrow").textContent =
           id === "cytoplasm" ? "Zellbereich im Fokus" : "Organell im Fokus";
@@ -3091,8 +3156,13 @@
         updateProcessOptions();
         processLabel.textContent = "Zellprozess im 3D-Modell";
         detailPanel.hidden = true;
+        setPanelExpanded(detailPanel, detailToggle, false);
         controlPanel.classList.remove("compact");
-        if (restoreFocus) selectedButton?.focus();
+        if (restoreFocus) {
+          const menuCollapsed = mobilePanels.matches && menuToggle.getAttribute("aria-expanded") === "false";
+          if (menuCollapsed) menuToggle.focus();
+          else selectedButton?.focus();
+        }
         animationRoot.visible = false;
         clearFunctionalAnimation();
         focusHalo.visible = false;
@@ -3186,8 +3256,13 @@
         controls.target.addScaledVector(direction, distance);
       }, { passive: false });
 
-      document.querySelector("#close-detail").addEventListener("click", () => closeDetail());
-      exploreToggle.addEventListener("click", () => setExplorationMode(!explorationMode));
+      for (const closeButton of document.querySelectorAll("#close-detail, #close-mobile-detail")) {
+        closeButton.addEventListener("click", () => closeDetail());
+      }
+      exploreToggle.addEventListener("click", () => {
+        setExplorationMode(!explorationMode);
+        collapseMenu();
+      });
       tissueToggle.addEventListener("click", () => {
         if (tissueMode && cellProcesses[processSelect.value]?.tissue) {
           processSelect.value = "";
@@ -3195,6 +3270,7 @@
           return;
         }
         setTissueMode(!tissueMode);
+        collapseMenu();
       });
       window.addEventListener("keydown", (event) => {
         if (event.defaultPrevented || event.target === processSelect) return;
@@ -3204,7 +3280,8 @@
         } else if (event.key === "Escape" && explorationMode) {
           event.preventDefault();
           setExplorationMode(false);
-          exploreToggle.focus();
+          if (mobilePanels.matches && menuToggle.getAttribute("aria-expanded") === "false") menuToggle.focus();
+          else exploreToggle.focus();
         }
       });
       renderer.domElement.addEventListener("keydown", (event) => {
